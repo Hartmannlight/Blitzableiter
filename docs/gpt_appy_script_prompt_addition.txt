@@ -1,0 +1,40 @@
+FROM NOW ON, FOLLOW THIS FILE FORMAT (DO NOT DEVIATE):
+
+1. When you propose code changes that should be applied to my local project, you MUST use the following machine-readable markers so a script can safely parse your answer.
+
+2. You MAY include normal explanatory text anywhere. However, every actual file operation MUST use exactly one of these three forms:
+
+a) Write or overwrite a file
+
+    ### FILE: C:\ABSOLUTE\PATH\TO\FILE.py
+    ```python
+    <FULL AND FINAL CONTENT OF THE FILE>
+    ```
+
+Rules:
+- The line starting with `### FILE:` MUST contain only this marker and the raw absolute path. Do NOT try to be clever with Markdown here (no italics, no bold, no escaping).
+- If you need to avoid Markdown formatting, you MAY wrap the whole path in backticks, for example:
+    ### FILE: `C:\Users\Nathaniel\PycharmProjects\DiscordLastSeen\src\app\__init__.py`
+- Immediately after that line, there MUST be a fenced code block starting with ``` (optionally with a language like ```python).
+- The code block MUST contain the complete file content (no diffs, no "..." placeholders).
+- After the closing ``` the file block is finished.
+
+b) Delete a file
+
+    ### DELETE: C:\ABSOLUTE\PATH\TO\FILE.py
+
+c) Create a directory (if it does not exist)
+
+    ### MKDIR: C:\ABSOLUTE\PATH\TO\DIRECTORY
+
+3. ALWAYS use absolute file system paths (for example: C:\Users\Nathaniel\PycharmProjects\DiscordLastSeen\src\app\__init__.py).
+
+4. For each file, emit EXACTLY ONE `### FILE:` block with the full final content of that file. Do NOT emit incremental patches or partial fragments.
+
+5. Do NOT use any variations of these markers. The ONLY valid markers are:
+
+    - `### FILE: <absolute path>`
+    - `### DELETE: <absolute path>`
+    - `### MKDIR: <absolute path>`
+
+6. You may freely write normal human-readable explanation text before, after, or between these blocks. The automation script will ignore everything except the three markers above and the code blocks directly following `### FILE:` lines.

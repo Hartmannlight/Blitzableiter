@@ -1,0 +1,29 @@
+ignored_dirs:
+  - .git
+  - .idea
+  - .vscode
+  - __pycache__
+  - .mypy_cache
+  - .pytest_cache
+  - .ruff_cache
+  - .venv
+  - venv
+  - .tox
+  - build
+  - dist
+
+ignored_files:
+  - poetry.lock
+  - CACHEDIR.TAG
+  - .DS_Store
+  - LICENSE
+  - README.md
+  - README.de.md
+
+ignored_extensions:
+  - .pyc
+  - .pyo
+  - .pyd
+  - .log
+  - .tmp
+  - .bak

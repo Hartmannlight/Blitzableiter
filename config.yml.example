@@ -1,0 +1,12 @@
+# Python-Boilerplate/config.yml.example
+service_name: python-service
+env: dev
+log_level: INFO
+
+metrics_enabled: true
+metrics_port: 8000
+
+loop_sleep_seconds: 5.0
+
+version: 0.1.0
+commit: local-dev

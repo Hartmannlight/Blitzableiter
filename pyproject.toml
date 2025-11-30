@@ -1,0 +1,57 @@
+# C:\Users\Nathaniel\PycharmProjects\Python-Boilerplate\pyproject.toml
+[tool.poetry]
+name = "python-boilerplate"
+version = "0.1.0"
+description = "Minimal Python service boilerplate with metrics, logging, and Docker."
+authors = ["Nathaniel <hartmannlight@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "app", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+prometheus-client = "^0.23.0"
+python-dotenv = "^1.0.1"
+pyyaml = "^6.0.2"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.7.1"
+mypy = "^1.11.2"
+pytest = "^8.3.0"
+coverage = "^7.6.0"
+pre-commit = "^4.0.1"
+pyperclip = "^1.9.0"
+types-PyYAML = "^6.0.12.20240808"
+
+[tool.poetry.scripts]
+app-sync = "app.main_sync:main"
+app-async = "app.main_async:main"
+app-health = "app.health:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.format]
+quote-style = "single"
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = false
+warn_unused_ignores = true
+warn_unreachable = true
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+show_missing = true
