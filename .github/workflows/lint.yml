@@ -3,7 +3,7 @@ name: lint
 
 on:
   push:
-    branches: ['**']
+    branches: ['main']
   pull_request:
 
 jobs:
@@ -33,5 +33,8 @@ jobs:
       - name: Run pre-commit
         run: poetry run pre-commit run --all-files
 
-      - name: Run tests
-        run: poetry run pytest
+      - name: Build test image
+        run: docker build --target test -t blitzableiter-test .
+
+      - name: Run tests in Docker
+        run: docker run --rm blitzableiter-test

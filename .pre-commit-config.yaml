@@ -15,6 +15,12 @@ repos:
         language: system
         pass_filenames: false
 
+      - id: coverage-85
+        name: coverage-85
+        entry: poetry run python scripts/coverage_check.py
+        language: system
+        pass_filenames: false
+
       - id: repo-state-check
         name: repo-state-check
         entry: poetry run python scripts/repo_state_check_gui.py

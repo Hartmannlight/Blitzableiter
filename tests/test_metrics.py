@@ -13,6 +13,7 @@ def make_config(metrics_enabled: bool = False) -> AppConfig:
         metrics_enabled=metrics_enabled,
         metrics_port=8000,
         loop_sleep_seconds=1.0,
+        health_file='test-health.json',
         version='0.0.0',
         commit='test',
         config_source='test',
@@ -25,3 +26,8 @@ def test_metrics_functions_do_not_crash() -> None:
     start_metrics_server(config)
     mark_iteration()
     mark_shutdown()
+
+
+def test_start_metrics_server_enabled() -> None:
+    config = make_config(metrics_enabled=True)
+    start_metrics_server(config)

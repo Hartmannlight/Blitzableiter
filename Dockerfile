@@ -1,5 +1,5 @@
 # Python-Boilerplate/Dockerfile
-FROM python:3.11-slim
+FROM python:3.11-slim AS base
 
 ENV PYTHONUNBUFFERED=1
 
@@ -21,8 +21,18 @@ RUN pip install --no-cache-dir poetry && \
     poetry install --no-root --only main
 
 COPY src /app/src
-ENV PYTHONPATH=/app/src
+ENV PYTHONPATH=/app/src:/app
+
+FROM base AS test
+
+RUN poetry install --no-root --with dev
+
+COPY tests /app/tests
+
+CMD ["poetry", "run", "pytest"]
+
+FROM base AS runtime
 
 EXPOSE 8000
 
-CMD ["poetry", "run", "app"]
+CMD ["poetry", "run", "app-sync"]

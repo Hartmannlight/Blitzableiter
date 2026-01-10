@@ -18,11 +18,24 @@ poetry.lock
 .vscode/
 
 .pytest_cache/
+.pytest_tmp/
+.test-work/
+.tmp/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+.nox/
+.tox/
+coverage.xml
 
 .env
 .env.*
+config.yml
 
 .mypy_cache/
 .ruff_cache/
 
 *.log
+
+codex.exe

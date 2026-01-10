@@ -1,421 +1,182 @@
-# Python Boilerplate – Sync & Async Service Template
+# Blitzableiter
 
-This boilerplate provides a clean, minimal, and observable foundation for Python services.
-It supports **two execution models**:
+Blitzableiter monitors speed traps and traffic hazards and sends notifications when they appear in
+your selected areas. You define those areas in a GeoJSON file, and alerts are delivered via
+Telegram, Discord, or email.
 
-1. **Synchronous services** – ideal for cron-style workers, polling loops, data processors, database/HTTP jobs.
-2. **Asynchronous services** – ideal for high-concurrency or event-driven systems such as Discord bots, WebSocket clients, async HTTP services, etc.
-
-Both models share the same configuration system, logging baseline, metrics, health checks, Docker setup, and CI pipeline.
-
----
-
-# 1. Features
-
-### Observability
-- Unified **JSON logging** (single line, includes timestamp, instance, env, service, error fields, etc.).
-- **Prometheus metrics** endpoint (`/metrics`) with baseline metrics:
-  - `app_up`
-  - `app_iterations_total`
-  - `app_last_iteration_timestamp_seconds`
-  - `app_build_info`
-- Built-in **health check** (`app-health`) that validates metrics freshness.
-- Lifecycle logging for startup, shutdown, and crashes.
-
-### Config
-- Load config from:
-  - environment variables
-  - optional YAML file (`config.yml`)
-- Config precedence: **env > YAML > defaults**
-- All values are validated and normalized (bool, int, float).
-
-### Sync & Async Runtime Models
-- **Sync service**: classic blocking loop (`service_sync.Service`)
-- **Async service**: asyncio-based loop (`service_async.AsyncService`)
-- Both controlled through separate entry points.
-
-### Development & CI
-- Poetry environment
-- Pre-commit (mypy, ruff, YAML/TOML/JSON checks)
-- GitHub Actions: lint + test + docker build + smoke test
-- Dockerfile with build cache support
-- Image name for GHCR is derived automatically from the repository name and lowercased in the CI workflow.
-
----
-
-# 2. When to use Sync vs. Async?
-
-### Use **sync** when:
-- You have a simple worker loop ("do something every X seconds").
-- You use blocking libraries (e.g. `requests`, psycopg2) and don’t need high concurrency.
-- You want minimal complexity.
-
-### Use **async** when:
-- You build a Discord bot, FastAPI app, WebSocket client, proxy, or any event-driven system.
-- You need to run many I/O operations concurrently.
-- You already rely on async libraries (`aiohttp`, `httpx.AsyncClient`, `asyncpg`, etc.).
-
-The boilerplate lets you choose the right model per project without changing the infrastructure.
-
----
-
-# 3. Directory Structure
-
-```text
-src/app
-│
-├── config.py          # unified configuration loading
-├── logging_setup.py   # JSON logging baseline
-├── metrics.py         # Prometheus metrics
-├── health.py          # CLI health endpoint
-│
-├── service_sync.py    # synchronous service loop
-├── service_async.py   # asynchronous service loop
-│
-├── main_sync.py       # entry point for sync workers
-└── main_async.py      # entry point for async workers
-````
-
----
-
-# 4. Running a Synchronous Service
-
-Sync entry point is installed as:
-
-```bash
-poetry run app-sync
+## User installation (Docker only)
+1) Copy `config.yml.example` to `config.yml` and add at least one GeoJSON file (see Configuration below).
+2) Create a `.env` file with your sender secrets, for example:
 ```
-
-or via Docker Compose:
-
+BLITZ_DISCORD_URL=https://discord.com/api/webhooks/...
+```
+3) Create a `docker-compose.yml` (replace `<org-or-user>` and `<repo>`):
 ```yaml
+version: '3.9'
+
 services:
   app:
-    command: ["poetry", "run", "app-sync"]
+    image: ghcr.io/<org-or-user>/<repo>:latest
+    env_file:
+      - .env
+    environment:
+      APP_SERVICE_NAME: blitzableiter
+      APP_ENV: prod
+      APP_LOG_LEVEL: INFO
+      APP_HEALTH_FILE: /tmp/app-health.json
+      APP_CONFIG_PATH: /app/config.yml
+      BLITZ_DATABASE_URL: postgresql://blitz:blitz@db:5432/blitz
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+      - ./geo:/data/geo:ro
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: blitz
+      POSTGRES_USER: blitz
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blitz}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+4) Start the stack:
+```
+docker compose up -d
+```
+5) Health check:
+```
+docker compose exec app poetry run app-health
 ```
 
-The sync service uses a classic blocking loop:
+## Configuration
+Config precedence is env vars > YAML (`config.yml`) > defaults. All time-of-day values are UTC.
 
-```python
-from app.service_sync import Service
-
-service = Service(config)
-service.start()
-```
-
----
-
-# 5. Running an Asynchronous Service
-
-Async entry point is:
-
-```bash
-poetry run app-async
-```
-
-or via Docker Compose:
-
+Example `config.yml`:
 ```yaml
-services:
-  app:
-    command: ["poetry", "run", "app-async"]
+health_file: .app-health.json
+
+global:
+  language: en                # "en" or "de"
+  default_interval: 900        # seconds
+  peak_interval: 300           # seconds
+  peak_hours_utc:
+    - "07:00-09:00"
+    - "16:00-18:00"
+  filters:
+    types: ["ts", "0", "1", "2", "3", "4", "5", "6", "vwd"]
+  reminder:
+    enable: true
+    maximum_days: 3
+    time_of_day_utc: "08:00"
+
+senders:
+  telegram_main:
+    kind: telegram
+    chat_id: "12345678"
+    token_env: "BLITZ_TELEGRAM_TOKEN"
+
+  discord_alerts:
+    kind: discord_webhook
+    url_env: "BLITZ_DISCORD_URL"
+
+  email_ops:
+    kind: email
+    from: "alert@example.com"
+    to: "ops@example.com"
+    smtp_host_env: "BLITZ_SMTP_HOST"
+    smtp_user_env: "BLITZ_SMTP_USER"
+    smtp_pass_env: "BLITZ_SMTP_PASS"
+
+areas:
+  karlsruhe_city:
+    geojson_path: "/data/geo/karlsruhe_city.geojson"
+    senders:
+      - telegram_main
+      - discord_alerts
 ```
 
-The async service runs on asyncio:
+YAML fields:
+- `health_file`: heartbeat file path used by `app-health` (default `.app-health.json`).
+- `global.language`: `en` or `de` (default `en`).
+- `global.default_interval`: seconds between polls outside peak windows (default `900`).
+- `global.peak_interval`: seconds between polls inside peak windows (default `300`).
+- `global.peak_hours_utc`: list of windows like `"07:00-09:00"` (UTC).
+- `global.filters.types`: list of POI type codes (default full set).
+- `global.reminder.enable`: enable daily reminders (default `true`).
+- `global.reminder.maximum_days`: max reminder days per POI (default `3`).
+- `global.reminder.time_of_day_utc`: reminder trigger time (UTC).
+- `senders.<name>.kind`: `telegram`, `discord_webhook`, or `email`.
+- `senders.<name>.token_env`: env var name for Telegram token.
+- `senders.<name>.chat_id`: Telegram chat id.
+- `senders.<name>.url_env`: env var name or literal Discord webhook URL.
+- `senders.<name>.smtp_host_env`, `smtp_user_env`, `smtp_pass_env`: SMTP env var names.
+- `senders.<name>.from`, `senders.<name>.to`: email addresses.
+- `areas.<name>.geojson_path`: file path to GeoJSON (in container).
+- `areas.<name>.senders`: list of sender names.
 
-```python
-from app.service_async import AsyncService
+Environment variables:
 
-service = AsyncService(config)
-await service.start()
+| Name | Purpose | Default | Example |
+| --- | --- | --- | --- |
+| `APP_CONFIG_PATH` | Where the app reads the YAML configuration file from | `config.yml` | `/app/config.yml` |
+| `APP_SERVICE_NAME` | Name used in logs and metrics labels for this service | `python-service` | `blitzableiter` |
+| `APP_ENV` | Environment label added to logs and build info | `dev` | `prod` |
+| `APP_LOG_LEVEL` | Minimum log level to output | `INFO` | `DEBUG` |
+| `APP_LOOP_SLEEP_SECONDS` | Manual override for the loop sleep time between cycles | from `global.default_interval` | `300` |
+| `APP_HEALTH_FILE` | Path to the heartbeat file checked by `app-health` | `.app-health.json` | `/tmp/app-health.json` |
+| `APP_VERSION` | Version string reported in logs and metrics | — | `1.2.3` |
+| `APP_COMMIT` | Commit SHA reported in logs and metrics | — | `abcdef1` |
+| `APP_INSTANCE` | Instance identifier reported in logs and metrics | hostname | `prod-eu-1` |
+| `BLITZ_DATABASE_URL` | Postgres URL to enable persistence (schema auto-created) | — | `postgresql://user:pass@host:5432/db` |
+| `DATABASE_URL` | Alternative Postgres URL if `BLITZ_DATABASE_URL` is not set | — | `postgresql://user:pass@host:5432/db` |
+| `BLITZ_DEFAULT_INTERVAL` | Override the default polling interval (seconds) | `900` | `600` |
+| `BLITZ_PEAK_INTERVAL` | Override the peak polling interval (seconds) | `300` | `120` |
+| `BLITZ_PEAK_HOURS_UTC` | Override peak time windows (comma-separated, UTC) | — | `07:00-09:00,16:00-18:00` |
+| `BLITZ_REMINDER_ENABLE` | Enable/disable daily reminder messages | `true` | `false` |
+| `BLITZ_REMINDER_MAX_DAYS` | Max number of reminder days per POI | `3` | `1` |
+| `BLITZ_REMINDER_TIME_UTC` | Reminder time of day in UTC | — | `08:30` |
+| `BLITZ_POI_TYPES` | Override which POI types are requested | full set | `ts,1` |
+| `BLITZ_LANGUAGE` | Language for notification text | `en` | `de` |
+| `BLITZ_DISABLE_NOTIFICATIONS` | Disable sending notifications (dry run) | `0` | `1` |
+| `BLITZ_TELEGRAM_TOKEN` | Telegram bot token used by Telegram sender | — | `123:abc` |
+| `BLITZ_DISCORD_URL` | Discord webhook URL used by Discord sender | — | `https://discord.com/api/webhooks/...` |
+| `BLITZ_SMTP_HOST` | SMTP host used by email sender | — | `smtp.example.com` |
+| `BLITZ_SMTP_USER` | SMTP username used by email sender | — | `user@example.com` |
+| `BLITZ_SMTP_PASS` | SMTP password used by email sender | — | `secret` |
+
+## Developer setup
+1) Install dependencies:
 ```
-
-### Typical use cases:
-
-* Discord bots
-* Async HTTP workers
-* Websocket clients
-* High-concurrency I/O tasks
-
----
-
-# 6. Health Check
-
-Every container can be validated via:
-
-```bash
-poetry run app-health
+poetry install
 ```
-
-Exit codes:
-
-* `0` → healthy
-* `1` → unhealthy
-
-This is the recommended Docker healthcheck command.
-
-Example Docker Compose:
-
-```yaml
-healthcheck:
-  test: ["CMD", "poetry", "run", "app-health"]
-  interval: 30s
-  timeout: 5s
-  retries: 3
-  start_period: 10s
+2) Copy `config.yml.example` to `config.yml` and adjust it for your test area.
+3) Start Postgres only:
 ```
-
----
-
-# 7. Metrics
-
-If enabled (`metrics_enabled=true`), the service exposes:
-
-```text
-http://localhost:<metrics_port>/metrics
+docker compose -f docker-compose.db.yml up -d
 ```
-
-Baseline metrics provide:
-
-* service liveness (`app_up`)
-* total loop iterations (`app_iterations_total`)
-* timestamp of last successful iteration (`app_last_iteration_timestamp_seconds`)
-* build information (`app_build_info{version,commit,env}`)
-
-These can be scraped by Prometheus and visualized in Grafana.
-
----
-
-# 8. Logging
-
-All logs follow the unified JSON format:
-
-```json
-{
-  "ts": "2025-11-22T20:01:23.123456Z",
-  "level": "info",
-  "service": "python-service",
-  "logger": "app.main_sync",
-  "instance": "myhost",
-  "env": "dev",
-  "msg": "Service startup succeeded",
-  "event": "startup_success"
-}
+4) Run the service locally:
 ```
-
-* All logs are single-line JSON on stdout.
-* Errors automatically include stack traces (`stack`) and `exception_type`.
-* Lifecycle events are logged explicitly: `startup_success`, `shutting_down`, `crashed`.
-
-This makes ingestion into Loki, Elastic, or any JSON-aware log pipeline straightforward.
-
----
-
-# 9. Configuration
-
-Configuration can come from:
-
-1. Environment variables
-2. YAML file (`config.yml`)
-3. Defaults
-
-### Example `.env` (see `.env.example`)
-
-```env
-# Core service configuration
-APP_SERVICE_NAME=python-service
-APP_ENV=dev
-APP_LOG_LEVEL=INFO
-
-# Build / version metadata (typically injected during CI build)
-APP_VERSION=0.1.0
-APP_COMMIT=local-dev
-
-# Optional: override instance ID
-APP_INSTANCE=local-dev
-
-# Optional: YAML config path (relative to working directory)
-APP_CONFIG_PATH=config.yml
-
-# Metrics configuration
-APP_METRICS_ENABLED=1
-APP_METRICS_PORT=8000
-
-# Main loop configuration
-APP_LOOP_SLEEP_SECONDS=5.0
+BLITZ_DATABASE_URL=postgresql://blitz:blitz@localhost:5432/blitz poetry run app-sync
 ```
-
-### Example `config.yml` (see `config.yml.example`)
-
-```yaml
-service_name: python-service
-env: dev
-log_level: INFO
-
-metrics_enabled: true
-metrics_port: 8000
-
-loop_sleep_seconds: 5.0
-
-version: 0.1.0
-commit: local-dev
+5) Run tests:
 ```
-
-Environment variables override YAML values; YAML overrides hardcoded defaults.
-
----
-
-# 10. Tests
-
-Run the full test suite:
-
-```bash
 poetry run pytest
 ```
 
-Coverage is configured via `coverage.ini` / `[tool.coverage.*]` in `pyproject.toml`.
-Pre-commit hooks ensure:
+Developer notes:
+- Health checks rely on a heartbeat file (`APP_HEALTH_FILE`) updated after each successful loop.
+- Tests also run in Docker via `docker build --target test -t blitzableiter-test .` + `docker run --rm blitzableiter-test`.
+- Config precedence is env vars > YAML > defaults; `areas` and `senders` must be defined in YAML.
 
-* type checking (mypy)
-* linting/formatting (ruff)
-* basic file hygiene (YAML/TOML/JSON + whitespace checks)
-* an optional GUI-based repo state check before committing.
-
----
-
-# 11. Docker
-
-Build and run locally:
-
-```bash
-docker build -t python-service .
-docker run --rm -p 8000:8000 python-service
-```
-
-The GitHub Actions workflow:
-
-* installs dependencies
-* runs tests
-* builds the Docker image
-* pushes to GHCR
-* performs a smoke test via `/metrics`
-
-The image name is derived from the repository owner and name in CI, lowercased:
-
-* `ghcr.io/<owner>/<repo>` → e.g. `ghcr.io/hartmannlight/python-boilerplate`
-
-You can adjust the image name logic in `.github/workflows/build.yml` if needed.
-
----
-
-# 12. Summary
-
-This boilerplate lets you start any kind of Python backend quickly:
-
-* **Sync workers** for polling, simple loops, and data processing
-* **Async services** for event-driven, high-concurrency environments
-
-Everything else (logging, health, metrics, config, CI, Docker) is unified and ready to use.
-
----
-
-# 13. Checklist: What you should change when using this boilerplate
-
-When you create a new project from this boilerplate, you should review and adapt at least the following items.
-
-### 13.1 Project metadata
-
-* In `pyproject.toml`:
-
-  * `[tool.poetry].name` → your project/package name
-  * `[tool.poetry].description` → short description of your service
-  * `[tool.poetry].authors` → your name/email
-  * `[tool.poetry].version` → initial version (e.g. `0.1.0` for your project)
-
-### 13.2 README and docs
-
-* Update the title and description in `README.md` to match your service.
-* If you keep `docs/observability-baseline.md`, you can:
-
-  * either reference it from the README
-  * or adapt it to your organization’s standards.
-
-### 13.3 Service entry point
-
-Decide which runtime model you actually need:
-
-* Sync:
-
-  * Use `app-sync` as the main entry point (`poetry run app-sync`).
-  * In Docker/Docker Compose, use `["poetry", "run", "app-sync"]`.
-* Async:
-
-  * Use `app-async` (`poetry run app-async`).
-  * In Docker/Docker Compose, use `["poetry", "run", "app-async"]`.
-
-Optional cleanups:
-
-* If your project will **never** use async, you can remove `service_async.py` and `main_async.py` and the `app-async` script.
-* If your project will **only** be async, you can remove `service_sync.py` and `main_sync.py` and the `app-sync` script.
-
-### 13.4 Configuration defaults
-
-Check and adapt:
-
-* `.env.example`
-
-  * `APP_SERVICE_NAME` → canonical name of your service
-  * `APP_ENV` → default environment (`dev`, `stg`, `prod`, etc.)
-  * `APP_METRICS_PORT` → port that fits your stack
-  * `APP_LOOP_SLEEP_SECONDS` → reasonable default for your loop
-* `config.yml.example`
-
-  * `service_name`, `env`, `log_level` as appropriate
-  * `metrics_enabled`, `metrics_port`
-  * `loop_sleep_seconds`
-  * `version` / `commit` (cosmetic; usually overwritten by CI)
-
-### 13.5 Docker & CI
-
-* `.github/workflows/build.yml`:
-
-  * The image name is derived automatically from GitHub repository owner and name, lowercased.
-  * If you want to push to a different registry or org (e.g. Docker Hub), adjust the `Prepare image name` step.
-
-* `docker-compose.yml` / `docker-compose.override.yml`:
-
-  * Ensure `image:` and `command:` match your desired entry point and registry.
-  * Update `container_name:` if you care about the container name.
-
-### 13.6 License
-
-* The template assumes `Apache-2.0` (see workflow labels and usually a `LICENSE` file).
-* If you use a different license:
-
-  * Update or replace `LICENSE`.
-  * Adjust the `org.opencontainers.image.licenses` label in `.github/workflows/build.yml` if needed.
-
-### 13.7 Repo-state check script (optional)
-
-* `scripts/repo_state_check_gui.py`:
-
-  * This is optional tooling to show a small GUI before committing.
-  * You can:
-
-    * Adapt the checks (e.g. enforce email domain, branch naming),
-    * Or remove this hook from `.pre-commit-config.yaml` if you don’t want interactive confirmation dialogs.
-
-### 13.8 Observability integration
-
-* Ensure your logging/metrics/health expectations match:
-
-  * If you add HTTP endpoints, consider:
-
-    * `/healthz` and `/readyz`
-    * HTTP metrics (`app_requests_total`, etc.)
-* If you use Prometheus/Grafana:
-
-  * Wire the metrics endpoint into your scrape config.
-  * Optionally add dashboards around `app_up`, `app_iterations_total`, and `app_build_info`.
-
-Once you have gone through this checklist and adapted these points, the boilerplate should behave as a first-class, project-specific service template in your environment.
+## Badges
+[![CI Status](https://img.shields.io/github/actions/workflow/status/<org-or-user>/<repo>/build.yml?label=CI%20Status)](https://github.com/<org-or-user>/<repo>/actions/workflows/build.yml)
+[![Docker Ready](https://img.shields.io/badge/docker-ready-0db7ed?logo=docker&logoColor=white)](https://ghcr.io)
+[![Test Coverage](https://img.shields.io/badge/coverage-unknown-lightgrey)](https://github.com/<org-or-user>/<repo>)
+[![Ruff](https://img.shields.io/badge/ruff-enabled-2c2f35)](https://github.com/astral-sh/ruff)
+[![Metrics](https://img.shields.io/badge/metrics-internal-lightgrey)](https://github.com/<org-or-user>/<repo>)

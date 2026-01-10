@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest  # type: ignore[import]
 
 from app.config import AppConfig, load_config
+from tests.helpers import make_test_dir
 
 
 def test_load_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -35,7 +36,8 @@ def test_load_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert config.config_source == 'env-only'
 
 
-def test_load_config_from_yaml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_config_from_yaml(monkeypatch: pytest.MonkeyPatch) -> None:
+    tmp_path = make_test_dir()
     config_file = tmp_path / 'config.yml'
     config_file.write_text(
         'service_name: yaml-service\n'
@@ -71,3 +73,19 @@ def test_load_config_from_yaml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert config.version == '9.9.9'
     assert config.commit == 'cafebabe'
     assert config.config_source == str(config_file.resolve())
+
+
+def test_load_config_uses_global_default_interval(monkeypatch: pytest.MonkeyPatch) -> None:
+    tmp_path = make_test_dir()
+    config_file = tmp_path / 'config.yml'
+    config_file.write_text(
+        'global:\n'
+        '  default_interval: 12.5\n'
+        'loop_sleep_seconds: 9.0\n',
+        encoding='utf-8',
+    )
+
+    monkeypatch.setenv('APP_CONFIG_PATH', str(config_file))
+    config = load_config()
+
+    assert config.loop_sleep_seconds == 9.0

@@ -3,12 +3,22 @@ version: '3.9'
 
 services:
   app:
-    image: ${IMAGE_NAME:-ghcr.io/example/python-service:latest}
-    container_name: python-service
+    image: ${IMAGE_NAME:-ghcr.io/example/blitzableiter:latest}
+    container_name: blitzableiter
     env_file:
       - .env
-    ports:
-      - '8000:8000'
+    environment:
+      APP_SERVICE_NAME: blitzableiter
+      APP_ENV: prod
+      APP_LOG_LEVEL: INFO
+      APP_HEALTH_FILE: /tmp/app-health.json
+      APP_CONFIG_PATH: /app/config.yml
+      BLITZ_DATABASE_URL: ${BLITZ_DATABASE_URL:-postgresql://blitz:blitz@db:5432/blitz}
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+      - ./geo:/data/geo:ro
+    depends_on:
+      - db
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'poetry', 'run', 'app-health']
@@ -16,3 +26,15 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: blitz
+      POSTGRES_USER: blitz
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blitz}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

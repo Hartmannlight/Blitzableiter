@@ -18,6 +18,7 @@ class AppConfig:
     metrics_enabled: bool
     metrics_port: int
     loop_sleep_seconds: float
+    health_file: str
     version: str
     commit: str
     config_source: str
@@ -31,6 +32,7 @@ _ENV_MAP: dict[str, str] = {
     'metrics_enabled': 'APP_METRICS_ENABLED',
     'metrics_port': 'APP_METRICS_PORT',
     'loop_sleep_seconds': 'APP_LOOP_SLEEP_SECONDS',
+    'health_file': 'APP_HEALTH_FILE',
 }
 
 
@@ -81,6 +83,7 @@ def load_config() -> AppConfig:
     config_path_env = os.getenv('APP_CONFIG_PATH', 'config.yml')
     config_path = Path(config_path_env).expanduser()
     yaml_config = _load_yaml_config(config_path)
+    global_config = yaml_config.get('global') if isinstance(yaml_config, dict) else {}
 
     def from_env_or_yaml(key: str, default: Any) -> Any:
         env_name = _ENV_MAP.get(key)
@@ -99,8 +102,14 @@ def load_config() -> AppConfig:
     metrics_port_raw = from_env_or_yaml('metrics_port', 8000)
     metrics_port = _get_int(metrics_port_raw, 8000)
 
-    loop_sleep_raw = from_env_or_yaml('loop_sleep_seconds', 5.0)
-    loop_sleep_seconds = _get_float(loop_sleep_raw, 5.0)
+    default_loop_sleep = 5.0
+    if isinstance(global_config, dict) and 'default_interval' in global_config:
+        default_loop_sleep = _get_float(global_config.get('default_interval'), 5.0)
+
+    loop_sleep_raw = from_env_or_yaml('loop_sleep_seconds', default_loop_sleep)
+    loop_sleep_seconds = _get_float(loop_sleep_raw, default_loop_sleep)
+
+    health_file = str(from_env_or_yaml('health_file', '.app-health.json'))
 
     version = os.getenv('APP_VERSION', str(yaml_config.get('version', '0.0.0')))
     commit = os.getenv('APP_COMMIT', str(yaml_config.get('commit', 'unknown')))
@@ -119,6 +128,7 @@ def load_config() -> AppConfig:
         metrics_enabled=metrics_enabled,
         metrics_port=metrics_port,
         loop_sleep_seconds=loop_sleep_seconds,
+        health_file=health_file,
         version=version,
         commit=commit,
         config_source=config_source,

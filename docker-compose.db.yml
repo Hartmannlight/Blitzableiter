@@ -1,0 +1,17 @@
+# docker-compose.db.yml
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: blitz
+      POSTGRES_USER: blitz
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blitz}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
