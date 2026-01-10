@@ -1,22 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, Sequence
-
+from collections.abc import Sequence
+from typing import Any, Protocol
 
 class Cursor(Protocol):
     def execute(self, query: str, params: Sequence[Any] | None = None) -> None: ...
-
     def fetchone(self) -> Sequence[Any] | None: ...
-
     def fetchall(self) -> list[Sequence[Any]] | None: ...
-
     def __enter__(self) -> Cursor: ...
-
     def __exit__(self, exc_type: Any, exc_value: Any, exc_traceback: Any) -> None: ...
-
 
 class Connection(Protocol):
     def cursor(self) -> Cursor: ...
-
 
 def connect(dsn: str, *args: Any, **kwargs: Any) -> Connection: ...

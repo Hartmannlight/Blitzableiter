@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir poetry && \
 
 COPY src /app/src
 COPY typings /app/typings
+COPY geo /app/geo
 ENV PYTHONPATH=/app/src:/app
 
 FROM base AS test
