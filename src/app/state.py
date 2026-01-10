@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
-from typing import Iterable
 
 from app.atudo_client import NormalizedPoi
 from app.metrics import (
@@ -59,7 +59,12 @@ class PoiStateStore:
     def __init__(self) -> None:
         self._records: dict[tuple[str, str], PoiRecord] = {}
 
-    def hydrate(self, persisted: Iterable[PersistedPoiState], now: datetime, active_grace: timedelta) -> None:
+    def hydrate(
+        self,
+        persisted: Iterable[PersistedPoiState],
+        now: datetime,
+        active_grace: timedelta,
+    ) -> None:
         for state in persisted:
             key = self._make_key(state.poi)
             is_active = state.last_seen_at >= now - active_grace

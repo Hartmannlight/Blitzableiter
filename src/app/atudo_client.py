@@ -6,9 +6,10 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Callable
+from datetime import UTC, datetime
+from typing import Any, cast
 
 from app.metrics import (
     mark_api_request_duration,
@@ -16,7 +17,6 @@ from app.metrics import (
     mark_api_request_success,
     mark_raw_snapshot_stored,
 )
-
 
 AtudoFetcher = Callable[[str], bytes]
 
@@ -31,7 +31,7 @@ class BoundingBox:
     def to_param(self) -> str:
         return f'{self.south},{self.west},{self.north},{self.east}'
 
-    def split(self, max_size: float = 1.0) -> list['BoundingBox']:
+    def split(self, max_size: float = 1.0) -> list[BoundingBox]:
         lat_span = self.north - self.south
         lon_span = self.east - self.west
         if lat_span <= max_size and lon_span <= max_size:
@@ -89,12 +89,13 @@ class AtudoClient:
         timeout: float = 5.0,
     ) -> None:
         self._base_url = base_url
-        self._fetcher = fetcher or self._default_fetcher
+        self._fetcher: AtudoFetcher = fetcher if fetcher is not None else self._default_fetcher
         self._timeout = timeout
 
     def _default_fetcher(self, url: str) -> bytes:
         with urllib.request.urlopen(url, timeout=self._timeout) as response:  # nosec B310
-            return response.read()
+            body = response.read()
+            return cast(bytes, body)
 
     def _build_url(self, bbox: BoundingBox, poi_types: tuple[str, ...], zoom: int) -> str:
         params = {
@@ -122,11 +123,12 @@ class AtudoClient:
         except json.JSONDecodeError:
             mark_api_request_failure(source='blitzer_de')
             raise
-        raw_hash = hashlib.sha256(json.dumps(response_body, sort_keys=True).encode('utf-8')).hexdigest()
+        response_body_json = json.dumps(response_body, sort_keys=True)
+        raw_hash = hashlib.sha256(response_body_json.encode('utf-8')).hexdigest()
         request_key = f'{bbox.to_param()}|z={zoom}'
         return AtudoResponse(
             request_key=request_key,
-            requested_at=datetime.now(timezone.utc),
+            requested_at=datetime.now(UTC),
             response_body=response_body,
             raw_hash=raw_hash,
         )
@@ -144,7 +146,11 @@ def normalize_poi(raw: dict[str, Any]) -> NormalizedPoi:
     except ValueError:
         vmax = None
 
-    address = raw.get('address') if isinstance(raw.get('address'), dict) else {}
+    raw_address = raw.get('address')
+    if isinstance(raw_address, dict):
+        address = cast(dict[str, Any], raw_address)
+    else:
+        address = {}
 
     return NormalizedPoi(
         source='blitzer_de',

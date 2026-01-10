@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential && \
+    apt-get install -y --no-install-recommends build-essential git tk && \
     rm -rf /var/lib/apt/lists/*
 
 ARG APP_VERSION=0.0.0
@@ -21,9 +21,12 @@ RUN pip install --no-cache-dir poetry && \
     poetry install --no-root --only main
 
 COPY src /app/src
+COPY typings /app/typings
 ENV PYTHONPATH=/app/src:/app
 
 FROM base AS test
+
+ENV CI=true
 
 RUN poetry install --no-root --with dev
 

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from app.atudo_client import (
     AtudoClient,
@@ -12,15 +13,16 @@ from app.atudo_client import (
     RawSnapshotStore,
     normalize_poi,
 )
-from app.blitz_config import AreaConfig, BlitzConfig, load_blitz_config
+from app.blitz_config import AreaConfig, load_blitz_config
 from app.db import PostgresRepository
 from app.notifications import NotificationDispatcher
-from app.state import NotificationIntent, PoiStateStore
+from app.state import PoiStateStore
 
 log = logging.getLogger(__name__)
 
-Observation = tuple[NormalizedPoi, tuple[str, ...], tuple[str, ...], dict, str]
-AggregatedObservation = tuple[NormalizedPoi, set[str], set[str], dict, str]
+Observation = tuple[NormalizedPoi, tuple[str, ...], tuple[str, ...], dict[str, Any], str]
+AggregatedObservation = tuple[NormalizedPoi, set[str], set[str], dict[str, Any], str]
+ObservationWithDb = tuple[NormalizedPoi, tuple[str, ...], tuple[str, ...], int | None]
 
 
 class BlitzableiterService:
@@ -48,17 +50,20 @@ class BlitzableiterService:
     def _hydrate_state(self) -> None:
         if not self._repository:
             return
-        grace_seconds = max(
-            self._config.polling.default_interval_seconds,
-            self._config.polling.peak_interval_seconds,
-        ) * 2
+        grace_seconds = (
+            max(
+                self._config.polling.default_interval_seconds,
+                self._config.polling.peak_interval_seconds,
+            )
+            * 2
+        )
         try:
             persisted = self._repository.load_poi_state()
             if not persisted:
                 return
             self._state.hydrate(
                 persisted,
-                now=datetime.now(timezone.utc),
+                now=datetime.now(UTC),
                 active_grace=timedelta(seconds=grace_seconds),
             )
             log.info('Hydrated POI state', extra={'count': len(persisted)})
@@ -75,7 +80,7 @@ class BlitzableiterService:
         )
 
     def run_cycle(self, now: datetime | None = None) -> int:
-        now = now or datetime.now(timezone.utc)
+        now = now or datetime.now(UTC)
         try:
             self.reload_config()
         except Exception:  # noqa: BLE001
@@ -96,16 +101,19 @@ class BlitzableiterService:
                     agg_areas.update(areas)
                     aggregated[poi_key] = (agg_poi, agg_senders, agg_areas, agg_raw, agg_req)
 
-        observations_with_db: list[tuple[NormalizedPoi, tuple[str, ...], tuple[str, ...], int | None]] = []
-        for poi, senders, areas, raw_payload, request_key in aggregated.values():
+        observations_with_db: list[ObservationWithDb] = []
+        for poi, agg_senders, agg_areas, raw_payload, request_key in aggregated.values():
             db_id = None
             if self._repository:
                 try:
                     db_id = self._repository.upsert_poi(poi, now)
                     self._repository.add_observation(db_id, now, raw_payload, request_key)
                 except Exception:  # noqa: BLE001
-                    log.exception('Database persistence failed for POI', extra={'poi': poi.source_poi_id})
-            observations_with_db.append((poi, tuple(senders), tuple(areas), db_id))
+                    log.exception(
+                        'Database persistence failed for POI',
+                        extra={'poi': poi.source_poi_id},
+                    )
+            observations_with_db.append((poi, tuple(agg_senders), tuple(agg_areas), db_id))
 
         notifications = self._state.process_observations(
             observations=observations_with_db,
@@ -140,7 +148,10 @@ class BlitzableiterService:
                         zoom=14,
                     )
                 except Exception:  # noqa: BLE001
-                    log.exception('API request failed', extra={'area': area.name, 'bbox': tile.to_param()})
+                    log.exception(
+                        'API request failed',
+                        extra={'area': area.name, 'bbox': tile.to_param()},
+                    )
                     continue
 
                 stored = self._snapshots.maybe_store(response)

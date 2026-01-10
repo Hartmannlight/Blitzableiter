@@ -8,7 +8,7 @@ import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.message import EmailMessage
 from typing import Protocol
 
@@ -22,8 +22,19 @@ log = logging.getLogger(__name__)
 class NotificationSender(Protocol):
     name: str
 
-    def send(self, intent: NotificationIntent) -> tuple[bool, str | None]:
-        ...
+    def send(self, intent: NotificationIntent) -> tuple[bool, str | None]: ...
+
+
+class NotificationRepository(Protocol):
+    def add_notification(
+        self,
+        poi_db_id: int | None,
+        sender_name: str,
+        notification_type: str,
+        sent_at: datetime,
+        success: bool,
+        error_message: str | None,
+    ) -> None: ...
 
 
 @dataclass
@@ -147,7 +158,7 @@ class NotificationDispatcher:
         self,
         sender_configs: dict[str, SenderConfig],
         language: str = 'en',
-        repository: object | None = None,
+        repository: NotificationRepository | None = None,
     ) -> None:
         self._sender_configs = sender_configs
         self._senders: dict[str, NotificationSender | None] = {}
@@ -194,7 +205,7 @@ class NotificationDispatcher:
                             poi_db_id=intent.db_id,
                             sender_name=sender_name,
                             notification_type=intent.notification_type,
-                            sent_at=datetime.now(timezone.utc),
+                            sent_at=datetime.now(UTC),
                             success=success,
                             error_message=error,
                         )
@@ -235,7 +246,10 @@ def _build_sender(sender_config: SenderConfig, language: str = 'en') -> Notifica
         token = sender_config.resolve_secret(sender_config.token_env or '')
         chat_id = sender_config.chat_id or ''
         if not token or not chat_id:
-            log.warning('Telegram sender missing token/chat_id', extra={'sender': sender_config.name})
+            log.warning(
+                'Telegram sender missing token/chat_id',
+                extra={'sender': sender_config.name},
+            )
             return None
         return TelegramSender(
             name=sender_config.name,
@@ -278,7 +292,10 @@ def _build_sender(sender_config: SenderConfig, language: str = 'en') -> Notifica
             to_addr=sender_config.to_addr,
         )
 
-    log.warning('Unknown sender kind', extra={'sender': sender_config.name, 'kind': sender_config.kind})
+    log.warning(
+        'Unknown sender kind',
+        extra={'sender': sender_config.name, 'kind': sender_config.kind},
+    )
     return None
 
 
@@ -328,7 +345,9 @@ def _label(key: str, lang: str) -> str:
             'new_alert': 'New alert',
             'reminder': 'Reminder (day {day})',
             'final_reminder': 'Final reminder (day {day})',
-            'final_note': 'Note: This is the final reminder; no further notifications will be sent.',
+            'final_note': (
+                'Note: This is the final reminder; no further notifications will be sent.'
+            ),
         },
         'de': {
             'location': 'Ort',
@@ -337,7 +356,10 @@ def _label(key: str, lang: str) -> str:
             'new_alert': 'Neue Meldung',
             'reminder': 'Erinnerung (Tag {day})',
             'final_reminder': 'Letzte Erinnerung (Tag {day})',
-            'final_note': 'Hinweis: Dies ist die letzte Erinnerung; es folgen keine weiteren Benachrichtigungen.',
+            'final_note': (
+                'Hinweis: Dies ist die letzte Erinnerung; es folgen keine weiteren '
+                'Benachrichtigungen.'
+            ),
         },
     }
     return labels.get(lang, labels['en']).get(key, key)

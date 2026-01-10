@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
+import pytest
 
 from app.atudo_client import NormalizedPoi
 from app.db import PostgresRepository
@@ -64,7 +66,7 @@ def test_repository_upsert_and_observation(monkeypatch) -> None:
 
     repo = PostgresRepository('postgresql://user:pass@localhost/db')
     poi = _make_poi()
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
 
     poi_id = repo.upsert_poi(poi, now)
     repo.add_observation(poi_id, now, poi.raw_payload, request_key='bbox')
@@ -73,7 +75,7 @@ def test_repository_upsert_and_observation(monkeypatch) -> None:
 
 
 def test_repository_load_state_with_notifications(monkeypatch) -> None:
-    now = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 2, tzinfo=UTC)
     rows = [
         (
             7,
@@ -116,7 +118,7 @@ def test_repository_store_snapshot_and_notification(monkeypatch) -> None:
         'Resp',
         (),
         {
-            'requested_at': datetime(2026, 1, 1, tzinfo=timezone.utc),
+            'requested_at': datetime(2026, 1, 1, tzinfo=UTC),
             'request_key': 'k1',
             'response_body': {'pois': []},
             'raw_hash': 'hash',
@@ -127,7 +129,7 @@ def test_repository_store_snapshot_and_notification(monkeypatch) -> None:
         poi_db_id=1,
         sender_name='s1',
         notification_type='initial',
-        sent_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        sent_at=datetime(2026, 1, 1, tzinfo=UTC),
         success=True,
         error_message=None,
     )
@@ -137,8 +139,5 @@ def test_repository_ensure_schema_failure(monkeypatch) -> None:
     scripted = [None]
     monkeypatch.setattr('app.db.psycopg', FakePsycopg(scripted))
 
-    try:
+    with pytest.raises(RuntimeError):
         PostgresRepository('postgresql://user:pass@localhost/db')
-        assert False, 'Expected RuntimeError'
-    except RuntimeError:
-        assert True

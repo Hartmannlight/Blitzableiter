@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime
 from typing import Any
 
-try:
-    import psycopg  # type: ignore
-    from psycopg import sql  # noqa: F401
-except ImportError:  # pragma: no cover
-    psycopg = None
-
 from app.atudo_client import AtudoResponse, NormalizedPoi
 from app.state import PersistedPoiState
+
+psycopg: Any | None = None
+_psycopg: Any | None = None
+try:
+    import psycopg as _imported_psycopg
+except ImportError:  # pragma: no cover
+    pass
+else:
+    _psycopg = _imported_psycopg
+psycopg = _psycopg
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +80,9 @@ CREATE TABLE IF NOT EXISTS poi_notifications (
 class PostgresRepository:
     def __init__(self, dsn: str) -> None:
         if psycopg is None:  # pragma: no cover
-            raise ImportError('psycopg is required for database persistence. Install psycopg[binary].')
+            raise ImportError(
+                'psycopg is required for database persistence. ' 'Install psycopg[binary].',
+            )
         self._dsn = dsn
         self._conn = psycopg.connect(dsn, autocommit=True)
         self._source_id = self._ensure_schema()
@@ -95,7 +100,13 @@ class PostgresRepository:
         with self._conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO raw_snapshots (source_id, requested_at, request_key, response_body, response_hash)
+                INSERT INTO raw_snapshots (
+                    source_id,
+                    requested_at,
+                    request_key,
+                    response_body,
+                    response_hash
+                )
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT DO NOTHING
                 """,
@@ -113,8 +124,18 @@ class PostgresRepository:
             cur.execute(
                 """
                 INSERT INTO pois (
-                    source_id, source_poi_id, lat, lng, poi_type, vmax,
-                    address, create_date, confirm_date, first_seen_at, last_seen_at, raw_payload
+                    source_id,
+                    source_poi_id,
+                    lat,
+                    lng,
+                    poi_type,
+                    vmax,
+                    address,
+                    create_date,
+                    confirm_date,
+                    first_seen_at,
+                    last_seen_at,
+                    raw_payload
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (source_id, source_poi_id) DO UPDATE
@@ -147,7 +168,13 @@ class PostgresRepository:
             row = cur.fetchone()
             return int(row[0])
 
-    def add_observation(self, poi_db_id: int, observed_at: datetime, raw_payload: dict[str, Any], request_key: str | None) -> None:
+    def add_observation(
+        self,
+        poi_db_id: int,
+        observed_at: datetime,
+        raw_payload: dict[str, Any],
+        request_key: str | None,
+    ) -> None:
         with self._conn.cursor() as cur:
             cur.execute(
                 """
@@ -169,7 +196,14 @@ class PostgresRepository:
         with self._conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO poi_notifications (poi_id, sender_name, notification_type, sent_at, success, error_message)
+                INSERT INTO poi_notifications (
+                    poi_id,
+                    sender_name,
+                    notification_type,
+                    sent_at,
+                    success,
+                    error_message
+                )
                 VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (poi_db_id, sender_name, notification_type, sent_at, success, error_message),
@@ -195,7 +229,8 @@ class PostgresRepository:
                 """,
                 (self._source_id,),
             )
-            rows = cur.fetchall() or []
+            fetched_rows = cur.fetchall()
+            rows: list[tuple[Any, ...]] = fetched_rows if fetched_rows is not None else []
 
         poi_ids = [int(row[0]) for row in rows]
         notifications_by_poi: dict[int, dict[str, set[str]]] = {}
@@ -215,7 +250,9 @@ class PostgresRepository:
                     notifications_by_poi.setdefault(poi_id, {}).setdefault(sender_name, set()).add(
                         notification_type,
                     )
-                    if isinstance(notification_type, str) and notification_type.startswith('reminder_day'):
+                    if isinstance(notification_type, str) and notification_type.startswith(
+                        'reminder_day'
+                    ):
                         day_raw = notification_type.removeprefix('reminder_day')
                         try:
                             reminder_days_by_poi.setdefault(poi_id, set()).add(int(day_raw))

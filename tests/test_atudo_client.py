@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import timezone
+from datetime import UTC
 
 import pytest
 
@@ -41,7 +41,7 @@ def test_fetch_parses_response_and_sets_metadata() -> None:
 
     assert response.request_key == '1.0,2.0,3.0,4.0|z=14'
     assert response.response_body == payload
-    assert response.requested_at.tzinfo == timezone.utc
+    assert response.requested_at.tzinfo == UTC
     assert response.pois()[0]['id'] == 'p1'
 
 

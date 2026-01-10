@@ -4,7 +4,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 def write_heartbeat(path: Path, status: str = 'ok', now: float | None = None) -> None:
@@ -31,14 +31,18 @@ def check_heartbeat(path: Path, loop_sleep_seconds: float, now: float | None = N
     if not isinstance(payload, dict):
         return 'health file payload invalid'
 
-    status = payload.get('status', 'ok')
+    payload_dict = cast(dict[str, Any], payload)
+    status = payload_dict.get('status', 'ok')
     if status != 'ok':
         return f'health status is {status}'
 
-    timestamp = payload.get('timestamp')
+    timestamp = payload_dict.get('timestamp')
+    if not isinstance(timestamp, int | float | str):
+        return 'health file timestamp invalid'
+
     try:
         last_ts = float(timestamp)
-    except (TypeError, ValueError):
+    except ValueError:
         return 'health file timestamp invalid'
 
     current = float(now if now is not None else time.time())

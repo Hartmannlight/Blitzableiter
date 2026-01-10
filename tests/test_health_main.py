@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 
 import pytest
 
-from app.config import AppConfig
 from app import health
+from app.config import AppConfig
 
 
 def _config(health_file: str) -> AppConfig:
@@ -23,6 +22,7 @@ def _config(health_file: str) -> AppConfig:
         config_source='test',
         instance='unit',
     )
+
 
 def test_health_main_ok(monkeypatch, capsys, tmp_path) -> None:
     health_file = tmp_path / 'health.json'

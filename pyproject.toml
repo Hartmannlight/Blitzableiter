@@ -45,6 +45,7 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
+mypy_path = ["typings"]
 ignore_missing_imports = false
 warn_unused_ignores = true
 warn_unreachable = true

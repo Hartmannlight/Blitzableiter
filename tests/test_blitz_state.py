@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta
 
 from app.atudo_client import NormalizedPoi
-from app.state import NotificationIntent, PersistedPoiState, PoiStateStore
+from app.state import PersistedPoiState, PoiStateStore
 
 
 def make_poi(poi_id: str = '1') -> NormalizedPoi:
@@ -23,7 +23,7 @@ def make_poi(poi_id: str = '1') -> NormalizedPoi:
 
 def test_poi_lifecycle_new_and_reminder() -> None:
     store = PoiStateStore()
-    now = datetime(2025, 1, 1, 7, 0, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 1, 7, 0, tzinfo=UTC)
     observations = [(make_poi(), ('sender-a',), ('area-a',), None)]
 
     intents = store.process_observations(
@@ -61,7 +61,7 @@ def test_poi_lifecycle_new_and_reminder() -> None:
 
 def test_hydrate_state_restores_notification_history() -> None:
     store = PoiStateStore()
-    now = datetime(2025, 1, 2, 9, 0, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 2, 9, 0, tzinfo=UTC)
     poi = make_poi('persisted-1')
     persisted = PersistedPoiState(
         poi=poi,
@@ -83,7 +83,7 @@ def test_hydrate_state_restores_notification_history() -> None:
 
 def test_hydrate_marks_stale_as_inactive_and_realerts_on_reappear() -> None:
     store = PoiStateStore()
-    now = datetime(2025, 1, 2, 9, 0, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 2, 9, 0, tzinfo=UTC)
     poi = make_poi('persisted-2')
     persisted = PersistedPoiState(
         poi=poi,
@@ -113,7 +113,7 @@ def test_hydrate_marks_stale_as_inactive_and_realerts_on_reappear() -> None:
 
 def test_process_observations_marks_missing_as_inactive() -> None:
     store = PoiStateStore()
-    now = datetime(2025, 1, 1, 9, 0, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 1, 9, 0, tzinfo=UTC)
     poi = make_poi('gone-1')
     store.process_observations(
         observations=[(poi, ('sender-a',), ('area-a',), None)],
@@ -137,7 +137,7 @@ def test_process_observations_marks_missing_as_inactive() -> None:
 
 def test_reminders_disabled_returns_empty() -> None:
     store = PoiStateStore()
-    now = datetime(2025, 1, 1, 9, 0, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 1, 9, 0, tzinfo=UTC)
     poi = make_poi('p1')
     store.process_observations(
         observations=[(poi, ('s1',), ('a1',), None)],
@@ -159,7 +159,7 @@ def test_reminders_disabled_returns_empty() -> None:
 
 def test_reminder_pending_when_before_time() -> None:
     store = PoiStateStore()
-    now = datetime(2025, 1, 2, 7, 0, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 2, 7, 0, tzinfo=UTC)
     poi = make_poi('reminder-1')
     store.process_observations(
         observations=[(poi, ('s1',), ('a1',), None)],
@@ -182,7 +182,7 @@ def test_reminder_pending_when_before_time() -> None:
 
 def test_reminder_skips_when_already_sent() -> None:
     store = PoiStateStore()
-    now = datetime(2025, 1, 3, 9, 0, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 3, 9, 0, tzinfo=UTC)
     poi = make_poi('reminder-2')
     store.process_observations(
         observations=[(poi, ('s1',), ('a1',), None)],
@@ -207,7 +207,7 @@ def test_reminder_skips_when_already_sent() -> None:
 
 def test_reminder_skips_after_max_days() -> None:
     store = PoiStateStore()
-    now = datetime(2025, 1, 10, 9, 0, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 10, 9, 0, tzinfo=UTC)
     poi = make_poi('reminder-3')
     store.process_observations(
         observations=[(poi, ('s1',), ('a1',), None)],
@@ -229,7 +229,7 @@ def test_reminder_skips_after_max_days() -> None:
 
 def test_build_notifications_skips_already_sent() -> None:
     store = PoiStateStore()
-    now = datetime(2025, 1, 1, 9, 0, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 1, 9, 0, tzinfo=UTC)
     poi = make_poi('dup')
     store.process_observations(
         observations=[(poi, ('s1',), ('a1',), None)],

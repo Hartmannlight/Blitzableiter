@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.config import AppConfig
 
 
@@ -93,11 +95,9 @@ def test_main_sync_crash_exits(monkeypatch) -> None:
     monkeypatch.setattr(main_sync, 'Service', FakeService)
     monkeypatch.setattr(main_sync.sys, 'exit', lambda code: (_ for _ in ()).throw(SystemExit(code)))
 
-    try:
+    with pytest.raises(SystemExit) as exc:
         main_sync.main()
-        assert False, 'Expected SystemExit'
-    except SystemExit as exc:
-        assert exc.code == 1
+    assert exc.value.code == 1
 
 
 def test_main_sync_signal_handler(monkeypatch) -> None:

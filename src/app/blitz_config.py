@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import time
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import yaml
 
@@ -182,7 +183,10 @@ def _load_senders(raw: dict[str, Any] | None) -> dict[str, SenderConfig]:
     return senders
 
 
-def _load_areas(raw: dict[str, Any] | None, senders: dict[str, SenderConfig]) -> dict[str, AreaConfig]:
+def _load_areas(
+    raw: dict[str, Any] | None,
+    senders: dict[str, SenderConfig],
+) -> dict[str, AreaConfig]:
     if not raw:
         return {}
     areas: dict[str, AreaConfig] = {}
@@ -215,7 +219,9 @@ def _load_areas(raw: dict[str, Any] | None, senders: dict[str, SenderConfig]) ->
 
 
 def load_blitz_config(path: str | Path | None = None) -> BlitzConfig:
-    config_path = Path(path or os.getenv('APP_CONFIG_PATH', 'config.yml')).expanduser()
+    env_path = os.getenv('APP_CONFIG_PATH')
+    resolved_path = path if path is not None else env_path or 'config.yml'
+    config_path = Path(resolved_path).expanduser()
     raw = _load_yaml(config_path)
 
     global_raw = raw.get('global', {}) if isinstance(raw, dict) else {}
@@ -224,7 +230,9 @@ def load_blitz_config(path: str | Path | None = None) -> BlitzConfig:
     peak_interval_env = os.getenv('BLITZ_PEAK_INTERVAL')
     peak_hours_env = os.getenv('BLITZ_PEAK_HOURS_UTC')
     if peak_hours_env:
-        peak_hours_raw: Iterable[Any] | None = [p.strip() for p in peak_hours_env.split(',') if p.strip()]
+        peak_hours_raw: Iterable[Any] | None = [
+            p.strip() for p in peak_hours_env.split(',') if p.strip()
+        ]
     else:
         peak_hours_raw = global_raw.get('peak_hours_utc')
         if peak_hours_raw is None:
@@ -232,11 +240,19 @@ def load_blitz_config(path: str | Path | None = None) -> BlitzConfig:
 
     polling = PollingConfig(
         default_interval_seconds=_parse_int(
-            default_interval_env if default_interval_env is not None else global_raw.get('default_interval'),
+            (
+                default_interval_env
+                if default_interval_env is not None
+                else global_raw.get('default_interval')
+            ),
             900,
         ),
         peak_interval_seconds=_parse_int(
-            peak_interval_env if peak_interval_env is not None else global_raw.get('peak_interval'),
+            (
+                peak_interval_env
+                if peak_interval_env is not None
+                else global_raw.get('peak_interval')
+            ),
             300,
         ),
         peak_windows=_parse_polling_windows(peak_hours_raw),
@@ -255,11 +271,19 @@ def load_blitz_config(path: str | Path | None = None) -> BlitzConfig:
 
     reminder = ReminderConfig(
         enabled=_parse_bool(
-            reminder_enabled_env if reminder_enabled_env is not None else reminder_raw.get('enable'),
+            (
+                reminder_enabled_env
+                if reminder_enabled_env is not None
+                else reminder_raw.get('enable')
+            ),
             True,
         ),
         max_days=_parse_int(
-            reminder_max_days_env if reminder_max_days_env is not None else reminder_raw.get('maximum_days'),
+            (
+                reminder_max_days_env
+                if reminder_max_days_env is not None
+                else reminder_raw.get('maximum_days')
+            ),
             3,
         ),
         time_of_day=_parse_time(reminder_time_value, time(hour=8, minute=0)),
@@ -267,7 +291,9 @@ def load_blitz_config(path: str | Path | None = None) -> BlitzConfig:
 
     poi_types_env = os.getenv('BLITZ_POI_TYPES')
     if poi_types_env:
-        poi_types = tuple(t.strip() for t in poi_types_env.split(',') if t.strip()) or DEFAULT_POI_TYPES
+        poi_types = (
+            tuple(t.strip() for t in poi_types_env.split(',') if t.strip()) or DEFAULT_POI_TYPES
+        )
     else:
         filters_raw = (global_raw or {}).get('filters') if isinstance(global_raw, dict) else None
         if isinstance(filters_raw, dict):

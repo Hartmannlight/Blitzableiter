@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.config import _get_bool, _get_float, _get_int, _load_yaml_config
 from tests.helpers import make_test_dir
 
@@ -33,8 +35,5 @@ def test_load_yaml_config_rejects_non_mapping() -> None:
     path = tmp / 'bad.yml'
     path.write_text('- bad\n', encoding='utf-8')
 
-    try:
+    with pytest.raises(ValueError):
         _load_yaml_config(path)
-        assert False, 'Expected ValueError'
-    except ValueError:
-        assert True

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from app.atudo_client import NormalizedPoi
@@ -70,9 +69,7 @@ def _write_geojson(path: Path) -> None:
                 'properties': {'name': 'test'},
                 'geometry': {
                     'type': 'Polygon',
-                    'coordinates': [
-                        [[0.0, 0.0], [0.0, 2.0], [2.0, 2.0], [2.0, 0.0], [0.0, 0.0]]
-                    ],
+                    'coordinates': [[[0.0, 0.0], [0.0, 2.0], [2.0, 2.0], [2.0, 0.0], [0.0, 0.0]]],
                 },
             }
         ],
@@ -98,7 +95,7 @@ def _write_config(path: Path, geo_path: Path) -> None:
 
 
 def test_hydrate_state_with_repository(monkeypatch) -> None:
-    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     repo = _FakeRepo(persisted=[_make_persisted(now)])
 
     tmp = make_test_dir()
@@ -110,7 +107,10 @@ def test_hydrate_state_with_repository(monkeypatch) -> None:
     monkeypatch.setenv('BLITZ_DATABASE_URL', 'postgresql://example')
     monkeypatch.setenv('APP_CONFIG_PATH', str(config))
     monkeypatch.setenv('BLITZ_DISABLE_NOTIFICATIONS', '1')
-    monkeypatch.setattr('app.blitz_service.PostgresRepository', lambda url: repo)
+    monkeypatch.setattr(
+        'app.blitz_service.PostgresRepository',
+        lambda url: repo,
+    )
 
     service = BlitzableiterService()
 
@@ -129,7 +129,10 @@ def test_hydrate_state_failure_is_swallowed(monkeypatch) -> None:
     monkeypatch.setenv('BLITZ_DATABASE_URL', 'postgresql://example')
     monkeypatch.setenv('APP_CONFIG_PATH', str(config))
     monkeypatch.setenv('BLITZ_DISABLE_NOTIFICATIONS', '1')
-    monkeypatch.setattr('app.blitz_service.PostgresRepository', lambda url: repo)
+    monkeypatch.setattr(
+        'app.blitz_service.PostgresRepository',
+        lambda url: repo,
+    )
 
     BlitzableiterService()
 
@@ -145,7 +148,10 @@ def test_run_cycle_ignores_repository_errors(monkeypatch) -> None:
     monkeypatch.setenv('BLITZ_DATABASE_URL', 'postgresql://example')
     monkeypatch.setenv('APP_CONFIG_PATH', str(config))
     monkeypatch.setenv('BLITZ_DISABLE_NOTIFICATIONS', '1')
-    monkeypatch.setattr('app.blitz_service.PostgresRepository', lambda url: repo)
+    monkeypatch.setattr(
+        'app.blitz_service.PostgresRepository',
+        lambda url: repo,
+    )
 
     service = BlitzableiterService()
 
@@ -155,13 +161,13 @@ def test_run_cycle_ignores_repository_errors(monkeypatch) -> None:
         body = {'pois': [{'backend': 'p1', 'lat': '1.0', 'lng': '2.0', 'type': '1'}]}
         return AtudoResponse(
             request_key='k1',
-            requested_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            requested_at=datetime(2026, 1, 1, tzinfo=UTC),
             response_body=body,
             raw_hash='hash',
         )
 
     service._client.fetch = _fake_fetch  # type: ignore[attr-defined]
-    service.run_cycle(now=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2026, 1, 1, tzinfo=UTC))
 
     assert repo.upserts == 0
 
@@ -177,7 +183,10 @@ def test_run_cycle_persists_observations(monkeypatch) -> None:
     monkeypatch.setenv('BLITZ_DATABASE_URL', 'postgresql://example')
     monkeypatch.setenv('APP_CONFIG_PATH', str(config))
     monkeypatch.setenv('BLITZ_DISABLE_NOTIFICATIONS', '1')
-    monkeypatch.setattr('app.blitz_service.PostgresRepository', lambda url: repo)
+    monkeypatch.setattr(
+        'app.blitz_service.PostgresRepository',
+        lambda url: repo,
+    )
 
     service = BlitzableiterService()
 
@@ -187,13 +196,13 @@ def test_run_cycle_persists_observations(monkeypatch) -> None:
         body = {'pois': [{'backend': 'p1', 'lat': '1.0', 'lng': '1.0', 'type': '1'}]}
         return AtudoResponse(
             request_key='k2',
-            requested_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            requested_at=datetime(2026, 1, 1, tzinfo=UTC),
             response_body=body,
             raw_hash='hash2',
         )
 
     service._client.fetch = _fake_fetch  # type: ignore[attr-defined]
-    service.run_cycle(now=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2026, 1, 1, tzinfo=UTC))
 
     assert repo.upserts == 1
     assert repo.observations
@@ -217,7 +226,10 @@ def test_store_raw_snapshot_failure_is_swallowed(monkeypatch) -> None:
     monkeypatch.setenv('BLITZ_DATABASE_URL', 'postgresql://example')
     monkeypatch.setenv('APP_CONFIG_PATH', str(config))
     monkeypatch.setenv('BLITZ_DISABLE_NOTIFICATIONS', '1')
-    monkeypatch.setattr('app.blitz_service.PostgresRepository', lambda url: repo)
+    monkeypatch.setattr(
+        'app.blitz_service.PostgresRepository',
+        lambda url: repo,
+    )
 
     service = BlitzableiterService()
 
@@ -227,13 +239,13 @@ def test_store_raw_snapshot_failure_is_swallowed(monkeypatch) -> None:
         body = {'pois': [{'backend': 'p1', 'lat': '1.0', 'lng': '1.0', 'type': '1'}]}
         return AtudoResponse(
             request_key='k3',
-            requested_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            requested_at=datetime(2026, 1, 1, tzinfo=UTC),
             response_body=body,
             raw_hash='hash3',
         )
 
     service._client.fetch = _fake_fetch  # type: ignore[attr-defined]
-    service.run_cycle(now=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2026, 1, 1, tzinfo=UTC))
 
     assert repo.upserts == 1
 
@@ -247,7 +259,10 @@ def test_db_init_failure_is_swallowed(monkeypatch) -> None:
 
     monkeypatch.setenv('APP_CONFIG_PATH', str(config))
     monkeypatch.setenv('BLITZ_DATABASE_URL', 'postgresql://example')
-    monkeypatch.setattr('app.blitz_service.PostgresRepository', lambda url: (_ for _ in ()).throw(RuntimeError('db')))
+    monkeypatch.setattr(
+        'app.blitz_service.PostgresRepository',
+        lambda url: (_ for _ in ()).throw(RuntimeError('db')),
+    )
 
     service = BlitzableiterService()
     assert service._repository is None
@@ -267,7 +282,7 @@ def test_run_cycle_handles_reload_config_error(monkeypatch) -> None:
     service.reload_config = lambda: (_ for _ in ()).throw(RuntimeError('bad'))  # type: ignore[assignment]
     service._process_area = lambda area: []  # type: ignore[assignment]
 
-    interval = service.run_cycle(now=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    interval = service.run_cycle(now=datetime(2026, 1, 1, tzinfo=UTC))
     assert interval == 5
 
 

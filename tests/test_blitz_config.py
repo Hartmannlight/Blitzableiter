@@ -50,7 +50,7 @@ def test_load_blitz_config(monkeypatch) -> None:
         '    token_env: "TEST_TOKEN"\n'
         'areas:\n'
         '  city:\n'
-        '    geojson_path: "' + str(geojson_path).replace("\\", "\\\\") + '"\n'
+        '    geojson_path: "' + str(geojson_path).replace('\\', '\\\\') + '"\n'
         '    senders:\n'
         '      - telegram_main\n',
         encoding='utf-8',
@@ -89,7 +89,7 @@ def test_env_overrides_utc_fields(monkeypatch) -> None:
         '    token_env: "TEST_TOKEN"\n'
         'areas:\n'
         '  city:\n'
-        '    geojson_path: "' + str(geojson_path).replace("\\", "\\\\") + '"\n'
+        '    geojson_path: "' + str(geojson_path).replace('\\', '\\\\') + '"\n'
         '    senders:\n'
         '      - telegram_main\n',
         encoding='utf-8',
@@ -127,7 +127,7 @@ def test_env_overrides_global_values(monkeypatch) -> None:
         '    token_env: "TEST_TOKEN"\n'
         'areas:\n'
         '  city:\n'
-        '    geojson_path: "' + str(geojson_path).replace("\\", "\\\\") + '"\n'
+        '    geojson_path: "' + str(geojson_path).replace('\\', '\\\\') + '"\n'
         '    senders:\n'
         '      - telegram_main\n',
         encoding='utf-8',

@@ -39,3 +39,4 @@ config.yml
 *.log
 
 codex.exe
+test-health.json

@@ -1,8 +1,6 @@
 # tests/test_config.py
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest  # type: ignore[import]
 
 from app.config import AppConfig, load_config
@@ -79,9 +77,7 @@ def test_load_config_uses_global_default_interval(monkeypatch: pytest.MonkeyPatc
     tmp_path = make_test_dir()
     config_file = tmp_path / 'config.yml'
     config_file.write_text(
-        'global:\n'
-        '  default_interval: 12.5\n'
-        'loop_sleep_seconds: 9.0\n',
+        'global:\n' '  default_interval: 12.5\n' 'loop_sleep_seconds: 9.0\n',
         encoding='utf-8',
     )
 

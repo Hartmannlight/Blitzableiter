@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+
+import pytest
 
 from app.geo import GeoRegion, _extract_polygons, _point_in_polygon, load_geojson_regions
 from tests.helpers import make_test_dir
@@ -63,8 +64,5 @@ def test_extract_polygons_invalid_inputs() -> None:
 def test_load_geojson_missing_file_raises() -> None:
     tmp = make_test_dir()
     path = tmp / 'missing.geojson'
-    try:
+    with pytest.raises(FileNotFoundError):
         load_geojson_regions(path)
-        assert False, 'Expected FileNotFoundError'
-    except FileNotFoundError:
-        assert True

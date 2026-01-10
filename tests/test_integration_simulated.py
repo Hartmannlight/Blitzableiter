@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.atudo_client import AtudoResponse
@@ -122,7 +122,7 @@ def _fake_response(lat: float, lng: float) -> AtudoResponse:
     raw = json.dumps(body, sort_keys=True)
     return AtudoResponse(
         request_key='synthetic',
-        requested_at=datetime.now(timezone.utc),
+        requested_at=datetime.now(UTC),
         response_body=body,
         raw_hash=hashlib.sha256(raw.encode('utf-8')).hexdigest(),
     )
@@ -146,7 +146,7 @@ def test_simulated_cycle_triggers_state(monkeypatch) -> None:
 
     service._client.fetch = fake_fetch  # type: ignore[attr-defined]
 
-    service.run_cycle(now=datetime(2025, 1, 1, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2025, 1, 1, tzinfo=UTC))
 
     snapshot = service._state.snapshot()
     assert snapshot  # at least one POI stored
@@ -179,7 +179,10 @@ def test_simulated_discord_notifications_over_days(monkeypatch) -> None:
     def fake_build_sender(config, language='en'):  # noqa: ARG001
         return fake_sender
 
-    monkeypatch.setattr('app.notifications._build_sender', fake_build_sender)
+    monkeypatch.setattr(
+        'app.notifications._build_sender',
+        fake_build_sender,
+    )
 
     service = BlitzableiterService()
 
@@ -188,19 +191,19 @@ def test_simulated_discord_notifications_over_days(monkeypatch) -> None:
 
     service._client.fetch = fake_fetch  # type: ignore[attr-defined]
 
-    service.run_cycle(now=datetime(2025, 1, 1, 7, 0, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2025, 1, 1, 7, 0, tzinfo=UTC))
     assert len(fake_sender.intents) == 1
     assert fake_sender.intents[-1].notification_type == 'initial'
 
-    service.run_cycle(now=datetime(2025, 1, 2, 7, 0, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2025, 1, 2, 7, 0, tzinfo=UTC))
     assert len(fake_sender.intents) == 1
 
-    service.run_cycle(now=datetime(2025, 1, 2, 8, 1, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2025, 1, 2, 8, 1, tzinfo=UTC))
     assert len(fake_sender.intents) == 2
     assert fake_sender.intents[-1].notification_type == 'reminder_day1'
     assert fake_sender.intents[-1].is_final_reminder is False
 
-    service.run_cycle(now=datetime(2025, 1, 3, 8, 1, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2025, 1, 3, 8, 1, tzinfo=UTC))
     assert len(fake_sender.intents) == 3
     assert fake_sender.intents[-1].notification_type == 'reminder_day2'
     assert fake_sender.intents[-1].is_final_reminder is True
@@ -227,7 +230,10 @@ def test_simulated_reappear_triggers_initial_again(monkeypatch) -> None:
     monkeypatch.delenv('BLITZ_DISABLE_NOTIFICATIONS', raising=False)
 
     fake_sender = FakeSender()
-    monkeypatch.setattr('app.notifications._build_sender', lambda config, language='en': fake_sender)
+    monkeypatch.setattr(
+        'app.notifications._build_sender',
+        lambda config, language='en': fake_sender,
+    )
 
     service = BlitzableiterService()
 
@@ -239,24 +245,24 @@ def test_simulated_reappear_triggers_initial_again(monkeypatch) -> None:
         raw = json.dumps(body, sort_keys=True)
         return AtudoResponse(
             request_key='synthetic-empty',
-            requested_at=datetime.now(timezone.utc),
+            requested_at=datetime.now(UTC),
             response_body=body,
             raw_hash=hashlib.sha256(raw.encode('utf-8')).hexdigest(),
         )
 
     service._client.fetch = fake_fetch_present  # type: ignore[attr-defined]
-    service.run_cycle(now=datetime(2025, 1, 1, 9, 0, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2025, 1, 1, 9, 0, tzinfo=UTC))
     assert [intent.notification_type for intent in fake_sender.intents] == ['initial']
 
     service._client.fetch = fake_fetch_empty  # type: ignore[attr-defined]
-    service.run_cycle(now=datetime(2025, 1, 2, 9, 0, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2025, 1, 2, 9, 0, tzinfo=UTC))
     assert [intent.notification_type for intent in fake_sender.intents] == ['initial']
     snapshot = service._state.snapshot()
     record = next(iter(snapshot.values()))
     assert record.active is False
 
     service._client.fetch = fake_fetch_present  # type: ignore[attr-defined]
-    service.run_cycle(now=datetime(2025, 1, 3, 9, 0, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2025, 1, 3, 9, 0, tzinfo=UTC))
     assert [intent.notification_type for intent in fake_sender.intents] == [
         'initial',
         'initial',
@@ -291,7 +297,10 @@ def test_simulated_multiple_senders_dedup(monkeypatch) -> None:
     def fake_build_sender(config, language='en'):  # noqa: ARG001
         return senders[config.name]
 
-    monkeypatch.setattr('app.notifications._build_sender', fake_build_sender)
+    monkeypatch.setattr(
+        'app.notifications._build_sender',
+        fake_build_sender,
+    )
 
     service = BlitzableiterService()
 
@@ -300,10 +309,10 @@ def test_simulated_multiple_senders_dedup(monkeypatch) -> None:
 
     service._client.fetch = fake_fetch  # type: ignore[attr-defined]
 
-    service.run_cycle(now=datetime(2025, 1, 1, 9, 0, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2025, 1, 1, 9, 0, tzinfo=UTC))
     assert len(senders['discord_main'].intents) == 1
     assert len(senders['telegram_main'].intents) == 1
 
-    service.run_cycle(now=datetime(2025, 1, 1, 9, 5, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2025, 1, 1, 9, 5, tzinfo=UTC))
     assert len(senders['discord_main'].intents) == 1
     assert len(senders['telegram_main'].intents) == 1

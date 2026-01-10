@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +27,7 @@ def main() -> None:
 
     health_error = _check_health_file(config)
     if health_error is not None:
+        ts = datetime.now(UTC).isoformat(timespec='seconds').replace('+00:00', 'Z')
         payload = {
             'status': 'error',
             'service': config.service_name,
@@ -34,18 +35,19 @@ def main() -> None:
             'version': config.version,
             'commit': config.commit,
             'error': health_error,
-            'timestamp': datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z'),
+            'timestamp': ts,
         }
         print(json.dumps(payload))
         sys.exit(1)
 
+    ts = datetime.now(UTC).isoformat(timespec='seconds').replace('+00:00', 'Z')
     payload = {
         'status': 'ok',
         'service': config.service_name,
         'env': config.env,
         'version': config.version,
         'commit': config.commit,
-        'timestamp': datetime.now(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z'),
+        'timestamp': ts,
     }
     print(json.dumps(payload))
     sys.exit(0)

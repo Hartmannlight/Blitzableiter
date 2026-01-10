@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import urllib.error
 
+import pytest
+
 from app.atudo_client import AtudoClient, AtudoResponse, BoundingBox, normalize_poi
 
 
@@ -33,11 +35,8 @@ def test_fetch_raises_for_transport_error() -> None:
     client = AtudoClient(fetcher=_boom)
     bbox = BoundingBox(south=0.0, west=0.0, north=1.0, east=1.0)
 
-    try:
+    with pytest.raises(urllib.error.URLError):
         client.fetch(bbox=bbox, poi_types=('1',), zoom=14)
-        assert False, 'Expected URLError'
-    except urllib.error.URLError:
-        assert True
 
 
 def test_default_fetcher_reads_body(monkeypatch) -> None:

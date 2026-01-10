@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.atudo_client import AtudoResponse
@@ -72,7 +72,7 @@ def _fake_response(lat: float, lng: float) -> AtudoResponse:
     raw = json.dumps(body, sort_keys=True)
     return AtudoResponse(
         request_key='synthetic',
-        requested_at=datetime.now(timezone.utc),
+        requested_at=datetime.now(UTC),
         response_body=body,
         raw_hash=hashlib.sha256(raw.encode('utf-8')).hexdigest(),
     )
@@ -106,7 +106,7 @@ def test_service_aggregates_senders_for_same_poi(monkeypatch) -> None:
 
     service._client.fetch = fake_fetch  # type: ignore[attr-defined]
 
-    service.run_cycle(now=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    service.run_cycle(now=datetime(2026, 1, 1, tzinfo=UTC))
 
     assert len(dispatcher.sent) == 2
     senders = {intent.senders[0] for intent in dispatcher.sent}
@@ -134,7 +134,7 @@ def test_service_handles_fetch_failures(monkeypatch) -> None:
 
     service._client.fetch = failing_fetch  # type: ignore[attr-defined]
 
-    interval = service.run_cycle(now=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    interval = service.run_cycle(now=datetime(2026, 1, 1, tzinfo=UTC))
 
     assert interval == 5
     assert dispatcher.sent == []

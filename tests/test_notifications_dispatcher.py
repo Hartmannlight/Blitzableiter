@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.atudo_client import NormalizedPoi
 from app.blitz_config import SenderConfig
@@ -105,7 +105,10 @@ def test_dispatcher_sender_failure_persists_error(monkeypatch) -> None:
         def send(self, intent: NotificationIntent):  # type: ignore[override]
             return False, 'bad'
 
-    monkeypatch.setattr('app.notifications._build_sender', lambda config, language='en': FailingSender())
+    monkeypatch.setattr(
+        'app.notifications._build_sender',
+        lambda config, language='en': FailingSender(),
+    )
     repo = FakeRepository()
     dispatcher = NotificationDispatcher(
         {'s1': SenderConfig(name='s1', kind='telegram', token_env='TOKEN', chat_id='1')},
@@ -117,7 +120,10 @@ def test_dispatcher_sender_failure_persists_error(monkeypatch) -> None:
 
 
 def test_dispatcher_handles_repository_failure(monkeypatch) -> None:
-    monkeypatch.setattr('app.notifications._build_sender', lambda config, language='en': FakeSender())
+    monkeypatch.setattr(
+        'app.notifications._build_sender',
+        lambda config, language='en': FakeSender(),
+    )
     dispatcher = NotificationDispatcher(
         {'s1': SenderConfig(name='s1', kind='telegram', token_env='TOKEN', chat_id='1')},
         repository=FailingRepository(),

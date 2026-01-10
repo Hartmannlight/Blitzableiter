@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -77,8 +78,7 @@ def _extract_polygons(geometry: dict[str, Any]) -> tuple[tuple[tuple[float, floa
 
 def _iter_features(data: dict[str, Any]) -> Iterable[dict[str, Any]]:
     if data.get('type') == 'FeatureCollection':
-        for feature in data.get('features', []) or []:
-            yield feature
+        yield from data.get('features', []) or []
         return
     if data.get('type') == 'Feature':
         yield data
