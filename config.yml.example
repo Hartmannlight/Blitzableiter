@@ -23,6 +23,8 @@ senders:
   discord_alerts:
     kind: discord_webhook
     url_env: "BLITZ_DISCORD_URL"
+    mention_user_id: "150284955140882433"
+    enable_map: true
 
   email_ops:
     kind: email

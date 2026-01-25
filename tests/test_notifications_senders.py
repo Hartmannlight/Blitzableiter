@@ -9,7 +9,7 @@ from app.notifications import (
     EmailSender,
     TelegramSender,
     _build_sender,
-    _format_discord_message,
+    _build_discord_embed,
     _mask_url,
     _notification_label,
     _parse_bool,
@@ -250,8 +250,8 @@ def test_notification_label_fallback() -> None:
     assert label == 'Custom Type'
 
 
-def test_format_discord_message_final_note() -> None:
+def test_format_discord_embed_final_note() -> None:
     intent = _intent(notification_type='reminder_day1', final=True)
-    message = _format_discord_message(intent, 'en')
-    assert 'Final reminder' in message
-    assert 'no further notifications' in message
+    embed = _build_discord_embed(intent, 'en')
+    assert 'Final reminder' in str(embed.get('description'))
+    assert 'no further notifications' in str(embed.get('description'))

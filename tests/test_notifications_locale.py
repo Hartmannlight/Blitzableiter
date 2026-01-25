@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.atudo_client import NormalizedPoi
-from app.notifications import _format_discord_message
+from app.notifications import _build_discord_embed
 from app.state import NotificationIntent
 
 
@@ -25,7 +25,9 @@ def test_discord_message_german_labels() -> None:
         area_names=('example_city',),
         is_final_reminder=False,
     )
-    msg = _format_discord_message(intent, 'de')
-    assert 'Neue Meldung' in msg
-    assert 'Mobiler Blitzer' in msg
-    assert 'Geschwindigkeitsbegrenzung: 50 km/h' in msg
+    embed = _build_discord_embed(intent, 'de')
+    assert embed['title'] == 'Mobiler Blitzer'
+    fields = {field['name']: field['value'] for field in embed['fields']}
+    assert fields['Geschwindigkeitsbegrenzung'] == '50 km/h'
+    assert fields['Straße'] == 'A8'
+    assert fields['Ort'] == 'Karlsruhe'

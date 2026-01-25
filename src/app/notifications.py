@@ -86,9 +86,21 @@ class DiscordWebhookSender:
     name: str
     url: str
     language: str = 'en'
+    mention_user_id: str | None = None
+    map_enabled: bool = True
 
     def send(self, intent: NotificationIntent) -> tuple[bool, str | None]:
-        payload = {'content': _format_discord_message(intent, self.language)}
+        return self.send_embeds([intent])
+
+    def send_embeds(self, intents: list[NotificationIntent]) -> tuple[bool, str | None]:
+        embeds = [
+            _build_discord_embed(intent, self.language, map_enabled=self.map_enabled)
+            for intent in intents
+        ]
+        payload: dict[str, object] = {'embeds': embeds}
+        if self.mention_user_id:
+            payload['content'] = f'<@{self.mention_user_id}>'
+            payload['allowed_mentions'] = {'users': [self.mention_user_id]}
         data = json.dumps(payload).encode('utf-8')
         request = urllib.request.Request(
             self.url,
@@ -169,51 +181,44 @@ class NotificationDispatcher:
             log.info('Notification persistence enabled', extra={'language': self._language})
 
     def send_all(self, intents: list[NotificationIntent]) -> None:
+        intents_by_sender: dict[str, list[NotificationIntent]] = {}
         for intent in intents:
             for sender_name in intent.senders:
-                sender = self._get_sender(sender_name)
-                if sender is None:
-                    mark_notification_result(sender_name, intent.notification_type, success=False)
-                    continue
+                intents_by_sender.setdefault(sender_name, []).append(intent)
 
-                if not self._delivery_enabled:
+        for sender_name, sender_intents in intents_by_sender.items():
+            sender = self._get_sender(sender_name)
+            if sender is None:
+                for intent in sender_intents:
+                    mark_notification_result(sender_name, intent.notification_type, success=False)
+                continue
+
+            if not self._delivery_enabled:
+                for intent in sender_intents:
                     log.info(
                         'Notification delivery disabled; skipping send',
                         extra={'sender': sender_name, 'poi': intent.poi.source_poi_id},
                     )
-                    success, error = True, None
-                else:
+                    self._record_result(intent, sender_name, True, None)
+                continue
+
+            if isinstance(sender, DiscordWebhookSender):
+                reminders = [intent for intent in sender_intents if _is_reminder(intent)]
+                others = [intent for intent in sender_intents if not _is_reminder(intent)]
+
+                for intent in others:
                     success, error = sender.send(intent)
+                    self._record_result(intent, sender_name, success, error)
 
-                if success:
-                    mark_notification_result(sender_name, intent.notification_type, success=True)
-                else:
-                    log.error(
-                        'Notification failed',
-                        extra={
-                            'sender': sender_name,
-                            'poi': intent.poi.source_poi_id,
-                            'error': error,
-                            'type': intent.notification_type,
-                        },
-                    )
-                    mark_notification_result(sender_name, intent.notification_type, success=False)
+                if reminders:
+                    success, error = sender.send_embeds(reminders)
+                    for intent in reminders:
+                        self._record_result(intent, sender_name, success, error)
+                continue
 
-                if self._repository:
-                    try:
-                        self._repository.add_notification(
-                            poi_db_id=intent.db_id,
-                            sender_name=sender_name,
-                            notification_type=intent.notification_type,
-                            sent_at=datetime.now(UTC),
-                            success=success,
-                            error_message=error,
-                        )
-                    except Exception:  # noqa: BLE001
-                        log.exception(
-                            'Failed to persist notification',
-                            extra={'sender': sender_name, 'poi': intent.poi.source_poi_id},
-                        )
+            for intent in sender_intents:
+                success, error = sender.send(intent)
+                self._record_result(intent, sender_name, success, error)
 
     def _get_sender(self, name: str) -> NotificationSender | None:
         if name in self._senders:
@@ -229,6 +234,43 @@ class NotificationDispatcher:
         self._senders[name] = sender
         return sender
 
+    def _record_result(
+        self,
+        intent: NotificationIntent,
+        sender_name: str,
+        success: bool,
+        error: str | None,
+    ) -> None:
+        if success:
+            mark_notification_result(sender_name, intent.notification_type, success=True)
+        else:
+            log.error(
+                'Notification failed',
+                extra={
+                    'sender': sender_name,
+                    'poi': intent.poi.source_poi_id,
+                    'error': error,
+                    'type': intent.notification_type,
+                },
+            )
+            mark_notification_result(sender_name, intent.notification_type, success=False)
+
+        if self._repository:
+            try:
+                self._repository.add_notification(
+                    poi_db_id=intent.db_id,
+                    sender_name=sender_name,
+                    notification_type=intent.notification_type,
+                    sent_at=datetime.now(UTC),
+                    success=success,
+                    error_message=error,
+                )
+            except Exception:  # noqa: BLE001
+                log.exception(
+                    'Failed to persist notification',
+                    extra={'sender': sender_name, 'poi': intent.poi.source_poi_id},
+                )
+
 
 def _parse_bool(value: str | None, default: bool) -> bool:
     if value is None:
@@ -239,6 +281,10 @@ def _parse_bool(value: str | None, default: bool) -> bool:
     if text in {'0', 'false', 'no', 'n'}:
         return False
     return default
+
+
+def _is_reminder(intent: NotificationIntent) -> bool:
+    return intent.notification_type.startswith('reminder_day')
 
 
 def _build_sender(sender_config: SenderConfig, language: str = 'en') -> NotificationSender | None:
@@ -274,6 +320,8 @@ def _build_sender(sender_config: SenderConfig, language: str = 'en') -> Notifica
             name=sender_config.name,
             url=url,
             language=language,
+            mention_user_id=sender_config.mention_user_id,
+            map_enabled=sender_config.enable_map,
         )
 
     if sender_config.kind == 'email':
@@ -340,6 +388,7 @@ def _label(key: str, lang: str) -> str:
     labels = {
         'en': {
             'location': 'Location',
+            'street': 'Street',
             'speed_limit': 'Speed limit',
             'areas': 'Areas',
             'new_alert': 'New alert',
@@ -348,9 +397,11 @@ def _label(key: str, lang: str) -> str:
             'final_note': (
                 'Note: This is the final reminder; no further notifications will be sent.'
             ),
+            'unknown': 'unknown',
         },
         'de': {
             'location': 'Ort',
+            'street': 'Straße',
             'speed_limit': 'Geschwindigkeitsbegrenzung',
             'areas': 'Gebiete',
             'new_alert': 'Neue Meldung',
@@ -360,9 +411,71 @@ def _label(key: str, lang: str) -> str:
                 'Hinweis: Dies ist die letzte Erinnerung; es folgen keine weiteren '
                 'Benachrichtigungen.'
             ),
+            'unknown': 'unbekannt',
         },
     }
     return labels.get(lang, labels['en']).get(key, key)
+
+
+def _embed_color(intent: NotificationIntent) -> int:
+    return 0xF39C12
+
+
+def _build_discord_embed(
+    intent: NotificationIntent,
+    lang: str,
+    map_enabled: bool = True,
+) -> dict[str, object]:
+    poi = intent.poi
+    address = poi.address or {}
+    city = address.get('city') or address.get('city_district') or ''
+    street = address.get('street') or ''
+    location = ', '.join(part for part in (street, city) if part) or f'{poi.lat:.4f},{poi.lng:.4f}'
+    areas = ', '.join(intent.area_names) if intent.area_names else _label('unknown', lang)
+    poi_label = _poi_type_label(poi.poi_type, lang)
+
+    speed_text = f'{poi.vmax} km/h' if poi.vmax else _label('unknown', lang)
+    fields = []
+    fields.append(
+        {'name': _label('street', lang), 'value': street or _label('unknown', lang), 'inline': False},
+    )
+    if city:
+        fields.append({'name': _label('location', lang), 'value': city, 'inline': True})
+    elif not street:
+        fields.append({'name': _label('location', lang), 'value': location, 'inline': True})
+    fields.append({'name': _label('speed_limit', lang), 'value': speed_text, 'inline': True})
+    if intent.area_names:
+        fields.append({'name': _label('areas', lang), 'value': areas, 'inline': False})
+
+    description = None
+    if _is_reminder(intent):
+        note = _label('final_note', lang) if intent.is_final_reminder else None
+        parts = [_notification_label(intent, lang)]
+        if note:
+            parts.append(note)
+        description = '\n'.join(parts)
+
+    embed: dict[str, object] = {
+        'title': poi_label,
+        'fields': fields,
+        'color': _embed_color(intent),
+    }
+    if map_enabled:
+        embed['image'] = {'url': _osm_staticmap_url(poi.lat, poi.lng)}
+    if description:
+        embed['description'] = description
+    return embed
+
+
+def _osm_staticmap_url(lat: float, lng: float) -> str:
+    lat_text = f'{lat:.5f}'
+    lng_text = f'{lng:.5f}'
+    return (
+        'https://haukauntrie.de/online/api/staticmaps/staticmap.php'
+        f'?center={lat_text},{lng_text}'
+        '&zoom=16&size=640x360'
+        f'&markers={lat_text},{lng_text},orange-pushpin'
+    )
 
 
 def _format_discord_message(intent: NotificationIntent, lang: str) -> str:
@@ -370,13 +483,16 @@ def _format_discord_message(intent: NotificationIntent, lang: str) -> str:
     address = poi.address or {}
     city = address.get('city') or address.get('city_district') or ''
     street = address.get('street') or ''
-    location = ', '.join(part for part in (street, city) if part) or f'{poi.lat:.4f},{poi.lng:.4f}'
-    areas = ', '.join(intent.area_names) if intent.area_names else 'unknown'
+    location = ', '.join(part for part in (street, city) if part) if (street or city) else ''
+    areas = ', '.join(intent.area_names) if intent.area_names else _label('unknown', lang)
     notif_label = _notification_label(intent, lang)
     poi_label = _poi_type_label(poi.poi_type, lang)
 
     lines = [f'{notif_label}: {poi_label}']
-    lines.append(f'{_label("location", lang)}: {location}')
+    if location:
+        lines.append(f'{_label("location", lang)}: {location}')
+    else:
+        lines.append(f'{_label("location", lang)}: {poi.lat:.4f},{poi.lng:.4f}')
     if poi.vmax:
         lines.append(f'{_label("speed_limit", lang)}: {poi.vmax} km/h')
     lines.append(f'{_label("areas", lang)}: {areas}')

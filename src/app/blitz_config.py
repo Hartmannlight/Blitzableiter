@@ -58,6 +58,8 @@ class SenderConfig:
     from_addr: str | None = None
     to_addr: str | None = None
     chat_id: str | None = None
+    mention_user_id: str | None = None
+    enable_map: bool = True
 
     def resolve_secret(self, env_name: str | None) -> str | None:
         if env_name is None:
@@ -179,6 +181,8 @@ def _load_senders(raw: dict[str, Any] | None) -> dict[str, SenderConfig]:
             from_addr=config.get('from'),
             to_addr=config.get('to'),
             chat_id=config.get('chat_id'),
+            mention_user_id=config.get('mention_user_id'),
+            enable_map=_parse_bool(config.get('enable_map'), True),
         )
     return senders
 
