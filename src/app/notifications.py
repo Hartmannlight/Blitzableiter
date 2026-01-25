@@ -437,7 +437,11 @@ def _build_discord_embed(
     speed_text = f'{poi.vmax} km/h' if poi.vmax else _label('unknown', lang)
     fields = []
     fields.append(
-        {'name': _label('street', lang), 'value': street or _label('unknown', lang), 'inline': False},
+        {
+            'name': _label('street', lang),
+            'value': street or _label('unknown', lang),
+            'inline': False,
+        },
     )
     if city:
         fields.append({'name': _label('location', lang), 'value': city, 'inline': True})

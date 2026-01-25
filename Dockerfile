@@ -25,6 +25,9 @@ COPY typings /app/typings
 COPY geo /app/geo
 ENV PYTHONPATH=/app/src:/app
 
+RUN poetry install --only main && \
+    poetry run python -c "import psycopg"
+
 FROM base AS test
 
 ENV CI=true
