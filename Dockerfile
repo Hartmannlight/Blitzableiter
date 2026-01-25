@@ -23,6 +23,7 @@ RUN pip install --no-cache-dir poetry && \
 COPY src /app/src
 COPY typings /app/typings
 COPY geo /app/geo
+COPY README.md /app/README.md
 ENV PYTHONPATH=/app/src:/app
 
 RUN poetry install --only main && \
