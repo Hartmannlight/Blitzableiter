@@ -15,19 +15,16 @@ ARG APP_COMMIT=unknown
 ENV APP_VERSION=$APP_VERSION
 ENV APP_COMMIT=$APP_COMMIT
 
-COPY pyproject.toml poetry.lock* /app/
+COPY pyproject.toml poetry.lock* README.md /app/
 
 RUN pip install --no-cache-dir poetry && \
-    poetry install --no-root --only main
+    poetry install --no-root --only main && \
+    poetry run python -c "import psycopg"
 
 COPY src /app/src
 COPY typings /app/typings
 COPY geo /app/geo
-COPY README.md /app/README.md
 ENV PYTHONPATH=/app/src:/app
-
-RUN poetry install --only main && \
-    poetry run python -c "import psycopg"
 
 FROM base AS test
 
