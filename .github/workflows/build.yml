@@ -1,76 +1,73 @@
-# .github/workflows/build.yml
-name: build
-
-on:
+name: Container Release
+'on':
   push:
-    branches: ['main']
-  release:
-    types: [published]
-
+    branches:
+    - main
+    tags:
+    - v*
+  pull_request: null
+  workflow_dispatch: null
+permissions:
+  contents: read
+concurrency:
+  group: container-release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
+  validate:
+    uses: ./.github/workflows/lint.yml
+  container:
+    runs-on: ubuntu-24.04
+    needs: validate
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
-
+      id-token: write
+      attestations: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build test image
-        run: docker build --target test -t blitzableiter-test .
-
-      - name: Run tests in Docker
-        run: docker run --rm blitzableiter-test
-
-      - name: Build runtime image for smoke test
-        run: docker build --target runtime -t blitzableiter-runtime .
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Prepare image name (lowercase)
-        id: prep
-        run: |
-          IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY_OWNER}/${GITHUB_REPOSITORY##*/}"
-          IMAGE_NAME="${IMAGE_NAME,,}"
-          echo "image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
-          echo "Using image name: $IMAGE_NAME"
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ steps.prep.outputs.image_name }}
-          tags: |
-            type=raw,value=latest
-            type=sha
-            type=ref,event=tag
-
-      - name: Set up buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            APP_VERSION=${{ github.ref_name }}
-            APP_COMMIT=${{ github.sha }}
-          cache-from: type=registry,ref=${{ steps.prep.outputs.image_name }}:buildcache
-          cache-to: type=registry,ref=${{ steps.prep.outputs.image_name }}:buildcache,mode=max
-
-      - name: Smoke test container
-        run: |
-          docker run -d --name app-test blitzableiter-runtime
-          sleep 5
-          docker exec app-test poetry run app-health
-          docker rm -f app-test
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+    - uses: Hartmannlight/pipeline-toolkit/actions/build@abb469f033ee28e00ba1061a47dddfc7d961129a
+      with:
+        target: runtime
+    - name: Runtime smoke test
+      run: |
+        docker run -d --name app-test candidate:gate
+        trap 'docker rm -f app-test' EXIT
+        for attempt in {1..30}; do
+          if docker exec app-test poetry run app-health; then exit 0; fi
+          sleep 2
+        done
+        docker logs app-test
+        exit 1
+    - uses: Hartmannlight/pipeline-toolkit/actions/scan@abb469f033ee28e00ba1061a47dddfc7d961129a
+    - if: github.event_name != 'pull_request'
+      uses: Hartmannlight/pipeline-toolkit/actions/publish@abb469f033ee28e00ba1061a47dddfc7d961129a
+      with:
+        image: ghcr.io/hartmannlight/blitzableiter
+        token: ${{ secrets.GITHUB_TOKEN }}
+    - if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: container-reports
+        path: artifacts/
+        retention-days: 14
+  maintenance-gate:
+    name: ci-gate
+    if: always()
+    needs:
+    - validate
+    - container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+    - name: Require every check
+      env:
+        RESULTS: ${{ toJSON(needs) }}
+      run: |
+        python3 - <<'PY'
+        import json, os
+        results = json.loads(os.environ['RESULTS'])
+        failed = {name: value['result'] for name, value in results.items() if value['result'] not in ('success',)}
+        if failed:
+            raise SystemExit(str(failed))
+        PY
