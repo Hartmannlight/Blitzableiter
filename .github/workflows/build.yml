@@ -34,7 +34,7 @@ jobs:
         docker run -d --name app-test candidate:gate
         trap 'docker rm -f app-test' EXIT
         for attempt in {1..30}; do
-          if docker exec app-test poetry run app-health; then exit 0; fi
+          if docker exec app-test python -m app.health; then exit 0; fi
           sleep 2
         done
         docker logs app-test
