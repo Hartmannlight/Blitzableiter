@@ -40,7 +40,8 @@ CMD ["poetry", "run", "pytest"]
 FROM base AS runtime
 
 ENV PATH="/app/.venv/bin:$PATH"
-RUN /usr/local/bin/python -m pip uninstall -y poetry pip setuptools wheel
+RUN /app/.venv/bin/python -m pip uninstall -y pip setuptools wheel \
+    && /usr/local/bin/python -m pip uninstall -y poetry pip setuptools wheel
 
 EXPOSE 8000
 
