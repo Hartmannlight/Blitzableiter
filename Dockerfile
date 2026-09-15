@@ -1,5 +1,5 @@
 # Python-Boilerplate/Dockerfile
-FROM python:3.11-slim AS base
+FROM python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534 AS base
 
 ENV PYTHONUNBUFFERED=1 POETRY_VIRTUALENVS_IN_PROJECT=true
 
@@ -37,7 +37,7 @@ COPY tests /app/tests
 
 CMD ["poetry", "run", "pytest"]
 
-FROM python:3.11-slim AS runtime
+FROM python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534 AS runtime
 
 ARG APP_VERSION=0.0.0
 ARG APP_COMMIT=unknown
