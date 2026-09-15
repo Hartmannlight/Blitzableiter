@@ -1,11 +1,12 @@
 # Python-Boilerplate/Dockerfile
 FROM python:3.11-slim AS base
 
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 POETRY_VIRTUALENVS_IN_PROJECT=true
 
 WORKDIR /app
 
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends build-essential git tk && \
     rm -rf /var/lib/apt/lists/*
 
@@ -36,8 +37,22 @@ COPY tests /app/tests
 
 CMD ["poetry", "run", "pytest"]
 
-FROM base AS runtime
+FROM python:3.11-slim AS runtime
+
+ARG APP_VERSION=0.0.0
+ARG APP_COMMIT=unknown
+ENV PYTHONUNBUFFERED=1 APP_VERSION=$APP_VERSION APP_COMMIT=$APP_COMMIT
+ENV PYTHONPATH=/app/src:/app
+WORKDIR /app
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends tk \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=base /app /app
+
+ENV PATH="/app/.venv/bin:$PATH"
+RUN /app/.venv/bin/python -m pip uninstall -y pip setuptools wheel \
+    && /usr/local/bin/python -m pip uninstall -y poetry pip setuptools wheel
 
 EXPOSE 8000
 
-CMD ["poetry", "run", "app-sync"]
+CMD ["python", "-m", "app.main_sync"]

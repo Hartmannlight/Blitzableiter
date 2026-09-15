@@ -1,40 +1,29 @@
-# Python-Boilerplate/.github/workflows/lint.yml
 name: lint
-
-on:
-  push:
-    branches: ['main']
-  pull_request:
-
 jobs:
   lint-and-tests:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Poetry
-        uses: abatilo/actions-poetry@v3
-        with:
-          poetry-version: '1.8.4'
-
-      - name: Install dependencies
-        run: poetry install
-
-      - name: Check pyproject
-        run: poetry check
-
-      - name: Run pre-commit
-        run: poetry run pre-commit run --all-files
-
-      - name: Build test image
-        run: docker build --target test -t blitzableiter-test .
-
-      - name: Run tests in Docker
-        run: docker run --rm blitzableiter-test
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Install Poetry
+      uses: abatilo/actions-poetry@v3
+      with:
+        poetry-version: 1.8.4
+    - name: Install dependencies
+      run: poetry install
+    - name: Check pyproject
+      run: poetry check
+    - name: Run pre-commit
+      run: poetry run pre-commit run --all-files
+    - name: Build test image
+      run: docker build --target test -t blitzableiter-test .
+    - name: Run tests in Docker
+      run: docker run --rm blitzableiter-test
+'on':
+  workflow_call: null
+permissions:
+  contents: read
