@@ -21,7 +21,7 @@ services:
       - db
     restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'poetry', 'run', 'app-health']
+      test: ['CMD', 'python', '-m', 'app.health']
       interval: 30s
       timeout: 5s
       retries: 3

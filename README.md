@@ -50,7 +50,7 @@ docker compose up -d
 ```
 5) Health check:
 ```text
-docker compose exec app poetry run app-health
+docker compose exec app python -m app.health
 ```
 
 ## Configuration
@@ -129,7 +129,7 @@ Environment variables (common):
 | `BLITZ_DATABASE_URL` | Postgres URL for persistence | unset |
 | `BLITZ_LANGUAGE` | Notification language | `en` |
 | `BLITZ_POI_TYPES` | Override POI types | full set |
-| `BLITZ_DISABLE_NOTIFICATIONS` | Disable sending (dry run) | `0` |
+| `BLITZ_DISABLE_NOTIFICATIONS` | Skip all delivery and delivery records while keeping data collection active | `0` |
 | `BLITZ_TELEGRAM_TOKEN` | Telegram token | unset |
 | `BLITZ_DISCORD_URL` | Discord webhook URL | unset |
 | `BLITZ_SMTP_HOST` | SMTP host | unset |

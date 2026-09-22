@@ -72,8 +72,10 @@ def _intent(sender: str) -> NotificationIntent:
 def test_dispatcher_skips_send_when_delivery_disabled(monkeypatch) -> None:
     monkeypatch.setenv('BLITZ_DISABLE_NOTIFICATIONS', '1')
     fake_sender = FakeSender()
+    built_senders = []
 
     def fake_build_sender(config, language='en'):  # noqa: ARG001
+        built_senders.append(config)
         return fake_sender
 
     monkeypatch.setattr('app.notifications._build_sender', fake_build_sender)
@@ -88,8 +90,8 @@ def test_dispatcher_skips_send_when_delivery_disabled(monkeypatch) -> None:
     dispatcher.send_all([_intent('s1')])
 
     assert fake_sender.calls == 0
-    assert repository.calls
-    assert repository.calls[0]['success'] is True
+    assert built_senders == []
+    assert repository.calls == []
 
 
 def test_dispatcher_handles_unknown_sender(monkeypatch) -> None:
