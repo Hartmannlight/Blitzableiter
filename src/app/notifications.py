@@ -187,19 +187,17 @@ class NotificationDispatcher:
                 intents_by_sender.setdefault(sender_name, []).append(intent)
 
         for sender_name, sender_intents in intents_by_sender.items():
+            if not self._delivery_enabled:
+                log.info(
+                    'Notification delivery disabled; skipping send',
+                    extra={'sender': sender_name, 'count': len(sender_intents)},
+                )
+                continue
+
             sender = self._get_sender(sender_name)
             if sender is None:
                 for intent in sender_intents:
                     mark_notification_result(sender_name, intent.notification_type, success=False)
-                continue
-
-            if not self._delivery_enabled:
-                for intent in sender_intents:
-                    log.info(
-                        'Notification delivery disabled; skipping send',
-                        extra={'sender': sender_name, 'poi': intent.poi.source_poi_id},
-                    )
-                    self._record_result(intent, sender_name, True, None)
                 continue
 
             if isinstance(sender, DiscordWebhookSender):
