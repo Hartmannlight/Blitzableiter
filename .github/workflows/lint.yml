@@ -10,7 +10,7 @@ jobs:
       with:
         python-version: '3.14.7'
     - name: Install Poetry
-      uses: abatilo/actions-poetry@fd0e6716a0de25ef6ade151b8b53190b0376acfd # v3
+      uses: abatilo/actions-poetry@3765cf608f2d4a72178a9fc5b918668e542b89b1 # v4
       with:
         poetry-version: 1.8.4
     - name: Install dependencies
