@@ -19,8 +19,14 @@ jobs:
       run: poetry check
     - name: Run pre-commit
       run: poetry run pre-commit run --all-files
+    - name: Set up Docker builder with upstream cache
+      uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      with:
+        buildkitd-config-inline: |
+          [registry."docker.io"]
+            mirrors = ["mirror.gcr.io"]
     - name: Build test image
-      run: docker build --target test -t blitzableiter-test .
+      run: docker buildx build --load --target test -t blitzableiter-test .
     - name: Run tests in Docker
       run: docker run --rm blitzableiter-test
 'on':
