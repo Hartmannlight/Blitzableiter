@@ -19,7 +19,7 @@ ruff = "^0.16.10"
 mypy = "^2.4.0"
 pytest = "^8.4.2"
 coverage = "^7.16.2"
-pre-commit = "^4.6.2"
+pre-commit = "^4.7.0"
 pyperclip = "^1.11.0"
 types-PyYAML = "^6.0.12.20240808"
 
